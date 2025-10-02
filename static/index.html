@@ -1,0 +1,379 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Bot 管理台</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+  <div class="max-w-5xl mx-auto p-6">
+    <h1 class="text-2xl font-semibold mb-4">🤖 Bot 管理台（MVP）</h1>
+
+    <!-- 未登录视图 -->
+    <div id="auth" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-white rounded-xl shadow p-6">
+        <h2 class="font-medium text-lg mb-2">登录</h2>
+        <div class="space-y-3">
+          <input id="login_user" class="w-full border rounded-md px-3 py-2" placeholder="用户名" />
+          <input id="login_pass" class="w-full border rounded-md px-3 py-2" placeholder="密码" type="password" />
+          <button onclick="login()" class="px-4 py-2 rounded-md bg-black text-white">登录</button>
+          <div id="login_msg" class="text-sm text-red-500"></div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow p-6">
+        <h2 class="font-medium text-lg mb-2">注册</h2>
+        <div class="space-y-3">
+          <input id="reg_user" class="w-full border rounded-md px-3 py-2" placeholder="用户名" />
+          <input id="reg_pass" class="w-full border rounded-md px-3 py-2" placeholder="密码" type="password" />
+          <button onclick="registerUser()" class="px-4 py-2 rounded-md bg-indigo-600 text-white">注册</button>
+          <div id="reg_msg" class="text-sm text-red-500"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 已登录视图 -->
+    <div id="app" class="hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <div id="welcome" class="text-gray-700"></div>
+        <button onclick="logout()" class="text-sm px-3 py-1.5 rounded-md bg-gray-200 hover:bg-gray-300">退出登录</button>
+      </div>
+
+      <!-- Bot 列表 -->
+      <div class="bg-white rounded-xl shadow p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-medium text-lg">我的 Bots</h2>
+          <div class="space-x-2">
+            <input id="new_bot_name" class="border rounded-md px-3 py-1.5" placeholder="bot 名称">
+            <input id="new_bot_token" class="border rounded-md px-3 py-1.5 w-80" placeholder="BotFather token">
+            <button onclick="addBot()" class="px-3 py-1.5 rounded-md bg-green-600 text-white">添加</button>
+          </div>
+        </div>
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-gray-500">
+            <th class="py-2">ID</th><th>名称</th><th>Token</th><th>操作</th></tr></thead>
+          <tbody id="bot_table"></tbody>
+        </table>
+      </div>
+
+      <!-- 命令管理（针对选中 bot） -->
+      <div class="bg-white rounded-xl shadow p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-medium text-lg">命令管理 <span id="current_bot" class="text-gray-500 text-sm"></span></h2>
+          <div class="space-x-2">
+            <button onclick="startBot()" class="px-3 py-1.5 rounded-md bg-black text-white">启动/重载</button>
+            <button onclick="stopBot()" class="px-3 py-1.5 rounded-md bg-gray-800 text-white">停止</button>
+            <button onclick="syncMenu()" class="px-3 py-1.5 rounded-md bg-gray-200">同步菜单</button>
+            <button onclick="openBlocks()" class="px-3 py-1.5 rounded-md bg-amber-500 text-white">积木编排</button>
+          </div>
+        </div>
+        <div class="grid md:grid-cols-6 gap-2 mb-3 items-center">
+          <input id="cmd" class="border rounded-md px-3 py-2 w-full md:col-span-2" placeholder="/ping">
+          <select id="kind" class="border rounded-md px-3 py-2">
+            <option value="text">文本</option>
+            <option value="photo">图片</option>
+            <option value="document">文档</option>
+            <option value="animation">动画/GIF</option>
+          </select>
+          <!-- 文本：reply / text -->
+          <input id="reply" class="border rounded-md px-3 py-2 md:col-span-3" placeholder="文本：支持 {{args}} 等变量；媒体：可做 caption">
+          <input id="media_url" class="border rounded-md px-3 py-2 md:col-span-3 hidden" placeholder="媒体 URL（photo/document/animation 使用）">
+          <select id="parse_mode" class="border rounded-md px-3 py-2">
+            <option value="">ParseMode: None</option>
+            <option value="MarkdownV2">MarkdownV2</option>
+            <option value="HTML">HTML</option>
+          </select>
+          <label class="inline-flex items-center gap-2">
+            <input id="no_preview" type="checkbox"> <span class="text-sm text-gray-600">禁用链接预览</span>
+          </label>
+          <button onclick="saveCmd()" class="px-3 py-2 rounded-md bg-indigo-600 text-white md:col-start-6">添加/更新</button>
+          <button onclick="eraseAll()" class="px-3 py-2 rounded-md bg-gray-200 md:col-start-6">清空</button>
+        </div>
+        <script>
+        const kindSel = document.getElementById('kind');
+        const mediaUrl = document.getElementById('media_url');
+        kindSel.addEventListener('change', ()=>{
+          const k = kindSel.value;
+          mediaUrl.classList.toggle('hidden', k==='text');
+        });
+        </script>
+
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-gray-500"><th class="py-2 w-48">指令</th><th>回复</th><th class="w-24">操作</th></tr></thead>
+          <tbody id="cmd_table"></tbody>
+        </table>
+        <div id="status" class="text-sm text-gray-600 mt-2"></div>
+      </div>
+
+      <!-- 流程列表 -->
+      <div class="bg-white rounded-xl shadow p-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-medium text-lg">流程列表</h2>
+          <div class="space-x-2">
+            <button onclick="openBlocks()" class="px-3 py-1.5 rounded-md bg-amber-500 text-white">新建/编辑</button>
+            <button onclick="publishFlows()" class="px-3 py-1.5 rounded-md bg-gray-800 text-white">发布（重载）</button>
+          </div>
+        </div>
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-gray-500">
+            <th class="py-2 w-16">ID</th><th>名称</th><th class="w-16">启用</th><th class="w-32">操作</th>
+          </tr></thead>
+          <tbody id="flow_table"></tbody>
+        </table>
+      </div>
+
+      <!-- 运行监控 -->
+      <div class="bg-white rounded-xl shadow p-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-medium text-lg">运行监控</h2>
+          <div class="space-x-2">
+            <button onclick="refreshStatus()" class="px-3 py-1.5 rounded-md bg-gray-200">立即刷新</button>
+          </div>
+        </div>
+        <div id="runtime_summary" class="text-sm text-gray-700 mb-3"></div>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <h3 class="font-medium text-gray-600 mb-2">当前 Bot 状态</h3>
+            <table class="w-full text-sm">
+              <tbody id="status_table"></tbody>
+            </table>
+          </div>
+          <div>
+            <h3 class="font-medium text-gray-600 mb-2">最近日志</h3>
+            <pre id="log_box" class="bg-black text-green-200 text-xs p-3 rounded-md h-64 overflow-auto"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+let currentUser=null, currentBotId=null;
+
+async function me(){
+  const r=await fetch('/api/me',{credentials:'same-origin'}); const j=await r.json();
+  currentUser=j.user;
+  document.getElementById('auth').classList.toggle('hidden', !!currentUser);
+  document.getElementById('app').classList.toggle('hidden', !currentUser);
+  if(currentUser){
+    document.getElementById('welcome').innerText=`你好，${currentUser.username}`;
+    loadBots();
+  }
+}
+async function registerUser(){
+  const username=document.getElementById('reg_user').value.trim();
+  const password=document.getElementById('reg_pass').value;
+  const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({username,password})});
+  const j=await r.json(); document.getElementById('reg_msg').innerText=j.ok?'✅ 已注册，去登录':'❌ '+(j.error||'失败');
+}
+async function login(){
+  const username=document.getElementById('login_user').value.trim();
+  const password=document.getElementById('login_pass').value;
+  const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({username,password})});
+  const j=await r.json(); document.getElementById('login_msg').innerText=j.ok?'':'❌ '+(j.error||'失败'); await me();
+}
+async function logout(){ await fetch('/api/logout',{method:'POST',credentials:'same-origin'}); location.reload(); }
+
+async function loadBots(){
+  const r=await fetch('/api/bots',{credentials:'same-origin'}); const j=await r.json();
+  const tb=document.getElementById('bot_table'); tb.innerHTML='';
+  (j.items||[]).forEach(b=>{
+    const tr=document.createElement('tr'); tr.className='border-t';
+    tr.innerHTML=`<td class="py-2">${b.id}</td>
+      <td>${b.name}</td><td class="text-gray-500">${b.token_mask}</td>
+      <td class="space-x-2">
+        <button class="text-indigo-600" onclick="selectBot(${b.id},'${b.name.replaceAll("'","\\'")}')">选择</button>
+        <button class="text-red-600" onclick="delBot(${b.id})">删除</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+  if(j.items && j.items.length && !currentBotId){
+    selectBot(j.items[0].id, j.items[0].name);
+  }
+}
+
+async function addBot(){
+  const name=document.getElementById('new_bot_name').value.trim();
+  const token=document.getElementById('new_bot_token').value.trim();
+  if(!name||!token){alert('name/token 必填');return;}
+  const r=await fetch('/api/bots',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({name,token})});
+  const j=await r.json(); if(!j.ok){alert(j.error||'失败');return;}
+  document.getElementById('new_bot_name').value=''; document.getElementById('new_bot_token').value='';
+  loadBots();
+}
+
+async function delBot(id){
+  if(!confirm('确认删除该 bot？')) return;
+  const r=await fetch('/api/bots/'+id,{method:'DELETE',credentials:'same-origin'}); const j=await r.json();
+  if(!j.ok) alert(j.error||'失败'); currentBotId=null; loadBots(); document.getElementById('cmd_table').innerHTML='';
+  document.getElementById('current_bot').innerText='';
+}
+
+/* --------- 选中 bot：加载数据 + 启动轮询 --------- */
+let _statusTimer = null;
+function selectBot(id, name){
+  currentBotId=id;
+  document.getElementById('current_bot').innerText=`（当前：${name} #${id}）`;
+  loadCmds();
+  loadFlows();
+  refreshStatus();
+  if(_statusTimer) clearInterval(_statusTimer);
+  _statusTimer = setInterval(refreshStatus, 3000);
+}
+window.addEventListener('beforeunload', ()=>{ if(_statusTimer) clearInterval(_statusTimer); });
+
+/* ---------- 指令 ---------- */
+async function loadCmds(){
+  if(!currentBotId) return;
+  const r=await fetch(`/api/bots/${currentBotId}/commands`,{credentials:'same-origin'}); const j=await r.json();
+  const tb=document.getElementById('cmd_table'); tb.innerHTML='';
+  (j.items||[]).forEach(it=>{
+    const tr=document.createElement('tr'); tr.className='border-t';
+    tr.innerHTML = `<td class="py-2">${it.command} <span class="text-gray-400">(${it.kind||'text'})</span></td>
+                    <td>${(it.reply||'').replaceAll('<','&lt;')}</td>
+                    <td><button class="text-red-600" onclick="delCmd('${it.command.replaceAll("'","\\'")}')">删除</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+async function saveCmd(){
+  if(!currentBotId){ alert('先选择一个 bot'); return; }
+  const command = document.getElementById('cmd').value.trim();
+  const kind = document.getElementById('kind').value;
+  const reply = document.getElementById('reply').value.trim();
+  const parse_mode = document.getElementById('parse_mode').value || null;
+  const disable_preview = document.getElementById('no_preview').checked;
+  const media_url = document.getElementById('media_url').value.trim();
+
+  let payload = null;
+  if(kind === 'text'){
+    payload = { text: reply || '' };
+  } else {
+    payload = { url: media_url || '', caption: reply || '' };
+  }
+
+  const r = await fetch(`/api/bots/${currentBotId}/commands`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'same-origin',
+    body: JSON.stringify({ command, kind, reply, payload, parse_mode, disable_preview })
+  });
+  const j = await r.json();
+  document.getElementById('status').innerText = j.ok ? '✅ 已保存' : ('❌ '+(j.error||'失败'));
+  loadCmds();
+}
+
+async function delCmd(command){
+  const r=await fetch(`/api/bots/${currentBotId}/commands/`+encodeURIComponent(command.replace(/^\//,'')),{method:'DELETE',credentials:'same-origin'});
+  const j=await r.json(); document.getElementById('status').innerText=j.ok?'🗑️ 已删':'❌ 失败'; loadCmds();
+}
+
+async function eraseAll(){
+  if(!confirm('确认清空所有命令？')) return;
+  const r=await fetch(`/api/bots/${currentBotId}/commands`,{method:'DELETE',credentials:'same-origin'}); const j=await r.json();
+  document.getElementById('status').innerText=j.ok?'🧹 已清空':'❌ 失败'; loadCmds();
+}
+
+/* ---------- 运行控制 ---------- */
+async function startBot(){
+  const r=await fetch(`/api/bots/${currentBotId}/start`,{method:'POST',credentials:'same-origin'}); const j=await r.json();
+  document.getElementById('status').innerText=j.ok?('🚀 '+j.msg):('❌ '+(j.error||j.msg));
+  refreshStatus();
+}
+async function stopBot(){
+  const r=await fetch(`/api/bots/${currentBotId}/stop`,{method:'POST',credentials:'same-origin'}); const j=await r.json();
+  document.getElementById('status').innerText=j.ok?('🛑 '+j.msg):('❌ '+(j.error||j.msg));
+  refreshStatus();
+}
+async function syncMenu(){
+  const r=await fetch(`/api/bots/${currentBotId}/sync`,{method:'POST',credentials:'same-origin'}); const j=await r.json();
+  document.getElementById('status').innerText=j.ok?('🔄 '+j.msg):('❌ '+(j.error||j.msg));
+}
+
+/* ---------- Flow 相关 ---------- */
+function openBlocks(flowId){
+  if(!currentBotId){ alert('先选择一个 bot'); return; }
+  window.open(`/static/blocks.html?bot_id=${currentBotId}` + (flowId?`&flow_id=${flowId}`:''), '_blank');
+}
+
+async function loadFlows(){
+  if(!currentBotId) return;
+  const r = await fetch(`/api/bots/${currentBotId}/flows`, { credentials:'same-origin' });
+  const j = await r.json();
+  const tb = document.getElementById('flow_table'); if(!tb) return;
+  tb.innerHTML = '';
+  (j.items||[]).forEach(f=>{
+    const tr = document.createElement('tr'); tr.className='border-t';
+    tr.innerHTML = `<td class="py-2">${f.id}</td>
+      <td>${f.name}</td>
+      <td>${f.active ? '✅' : '❌'}</td>
+      <td class="space-x-2">
+        <button class="text-indigo-600" onclick="openBlocks(${f.id})">编辑</button>
+        <button class="text-red-600" onclick="deleteFlow(${f.id})">删除</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+
+async function deleteFlow(flowId){
+  if(!confirm('确认删除该流程？')) return;
+  const r = await fetch(`/api/bots/${currentBotId}/flows/${flowId}`, { method:'DELETE', credentials:'same-origin' });
+  const j = await r.json();
+  document.getElementById('status').innerText = j.ok ? '🗑️ 已删除流程' : '❌ 删除失败';
+  loadFlows();
+}
+
+async function publishFlows(){
+  const r = await fetch(`/api/bots/${currentBotId}/start`, { method:'POST', credentials:'same-origin' });
+  const j = await r.json();
+  document.getElementById('status').innerText = j.ok ? '🚀 已发布（重载）' : ('❌ '+(j.error||j.msg));
+  refreshStatus();
+}
+
+/* ---------- 监控 & 日志 ---------- */
+function fmtUptime(sec){
+  sec = Number(sec||0);
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  return `${h}h ${m}m ${s}s`;
+}
+function badge(state){
+  const map = { running:'bg-emerald-100 text-emerald-700', stopped:'bg-gray-100 text-gray-700', errored:'bg-red-100 text-red-700', starting:'bg-amber-100 text-amber-700' };
+  const cls = map[state] || 'bg-gray-100 text-gray-700';
+  return `<span class="px-2 py-0.5 rounded ${cls}">${state}</span>`;
+}
+async function refreshStatus(){
+  if(!currentBotId) return;
+  // 当前 bot 状态
+  const r1 = await fetch(`/api/bots/${currentBotId}/status`, { credentials:'same-origin' });
+  const s = (await r1.json()).status || {};
+  const tb = document.getElementById('status_table');
+  tb.innerHTML = `
+    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">State</td><td class="py-1">${badge(s.state||'stopped')}</td></tr>
+    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">Uptime</td><td class="py-1">${fmtUptime(s.uptime||0)}</td></tr>
+    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">Messages</td><td class="py-1">${(s.stats&&s.stats.messages)||0}</td></tr>
+    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">Errors</td><td class="py-1">${(s.stats&&s.stats.errors)||0} ${s.last_error?`<div class="text-red-600 truncate" title="${s.last_error}">${s.last_error}</div>`:''}</td></tr>
+    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">Specs/Flows</td><td class="py-1">${s.specs_count||0} / ${s.flows_count||0}</td></tr>
+  `;
+
+  // 日志
+  const r2 = await fetch(`/api/bots/${currentBotId}/logs?lines=150`, { credentials:'same-origin' });
+  const logs = (await r2.json()).items || [];
+  const box = document.getElementById('log_box');
+  box.textContent = logs.map(l=>{
+    const dt = new Date((l.ts||0)*1000).toLocaleTimeString();
+    return `[${dt}] ${l.level||'info'}: ${l.msg}`;
+  }).join('\n');
+  box.scrollTop = box.scrollHeight;
+
+  // 汇总
+  const r3 = await fetch(`/api/bots/status_all`, { credentials:'same-origin' });
+  const all = (await r3.json()).items || [];
+  document.getElementById('runtime_summary').innerHTML =
+    all.map(it=>`<span class="inline-block mr-2 mb-2 px-2 py-0.5 rounded border ${it.state==='running'?'border-emerald-300':'border-gray-300'}">${it.name} ${badge(it.state)} <span class="text-xs text-gray-500">m:${it.stats?.messages||0}/e:${it.stats?.errors||0}</span></span>`).join(' ');
+}
+
+me();
+</script>
+</body>
+</html>
