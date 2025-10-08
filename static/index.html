@@ -4,7 +4,38 @@
   <meta charset="utf-8" />
   <title>Bot 管理台</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes fade-in-up {
+      0% { opacity: 0; transform: translateY(16px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    .animate-card { animation: fade-in-up 0.4s ease-out both; }
+    .panel-tab {
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.75rem;
+      background-color: #f3f4f6;
+      color: #4b5563;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04);
+    }
+    .panel-tab:hover {
+      background-color: #e5e7eb;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(148,163,184,0.25);
+    }
+    .panel-tab.active {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      box-shadow: 0 12px 24px rgba(99,102,241,0.35);
+    }
+    .panel-surface {
+      transition: opacity 0.2s ease;
+    }
+  </style>
 </head>
 <body class="bg-gray-50">
   <div class="max-w-5xl mx-auto p-6">
@@ -42,85 +73,170 @@
 
       <!-- Bot 列表 -->
       <div class="bg-white rounded-xl shadow p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="font-medium text-lg">我的 Bots</h2>
-          <div class="space-x-2">
+        <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-4">
+          <div>
+            <h2 class="font-medium text-lg">我的 Bots</h2>
+            <p class="text-sm text-gray-500">点击卡片查看详情，可直接从列表启动/停止。</p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-2 w-full md:w-auto">
             <input id="new_bot_name" class="border rounded-md px-3 py-1.5" placeholder="bot 名称">
-            <input id="new_bot_token" class="border rounded-md px-3 py-1.5 w-80" placeholder="BotFather token">
-            <button onclick="addBot()" class="px-3 py-1.5 rounded-md bg-green-600 text-white">添加</button>
+            <input id="new_bot_token" class="border rounded-md px-3 py-1.5" placeholder="BotFather token">
+            <button onclick="addBot()" class="px-3 py-1.5 rounded-md bg-green-600 text-white transition-transform duration-200 hover:-translate-y-0.5 hover:shadow">添加</button>
           </div>
         </div>
-        <table class="w-full text-sm">
-          <thead><tr class="text-left text-gray-500">
-            <th class="py-2">ID</th><th>名称</th><th>Token</th><th>操作</th></tr></thead>
-          <tbody id="bot_table"></tbody>
-        </table>
+        <div id="bot_cards" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
       </div>
 
-      <!-- 命令管理（针对选中 bot） -->
+      <!-- Bot 控制中心 -->
       <div class="bg-white rounded-xl shadow p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="font-medium text-lg">命令管理 <span id="current_bot" class="text-gray-500 text-sm"></span></h2>
-          <div class="space-x-2">
-            <button onclick="startBot()" class="px-3 py-1.5 rounded-md bg-black text-white">启动/重载</button>
-            <button onclick="stopBot()" class="px-3 py-1.5 rounded-md bg-gray-800 text-white">停止</button>
-            <button onclick="syncMenu()" class="px-3 py-1.5 rounded-md bg-gray-200">同步菜单</button>
-            <button onclick="openBlocks()" class="px-3 py-1.5 rounded-md bg-amber-500 text-white">积木编排</button>
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+          <div>
+            <h2 class="font-medium text-lg">Bot 控制中心 <span id="current_bot" class="text-gray-500 text-sm"></span></h2>
+            <p class="text-xs text-gray-400">所有固定指令、流程与伪代码集中管理。</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="startBot()" class="px-3 py-1.5 rounded-md bg-black text-white transition hover:-translate-y-0.5 hover:shadow">启动/重载</button>
+            <button onclick="stopBot()" class="px-3 py-1.5 rounded-md bg-gray-800 text-white transition hover:-translate-y-0.5 hover:shadow">停止</button>
+            <button onclick="syncMenu()" class="px-3 py-1.5 rounded-md bg-gray-200 transition hover:bg-gray-300">同步菜单</button>
+            <button onclick="openBlocks()" class="px-3 py-1.5 rounded-md bg-amber-500 text-white transition hover:-translate-y-0.5 hover:shadow">积木编排</button>
           </div>
         </div>
-        <div class="grid md:grid-cols-6 gap-2 mb-3 items-center">
-          <input id="cmd" class="border rounded-md px-3 py-2 w-full md:col-span-2" placeholder="/ping">
-          <select id="kind" class="border rounded-md px-3 py-2">
-            <option value="text">文本</option>
-            <option value="photo">图片</option>
-            <option value="document">文档</option>
-            <option value="animation">动画/GIF</option>
-          </select>
-          <!-- 文本：reply / text -->
-          <input id="reply" class="border rounded-md px-3 py-2 md:col-span-3" placeholder="文本：支持 {{args}} 等变量；媒体：可做 caption">
-          <input id="media_url" class="border rounded-md px-3 py-2 md:col-span-3 hidden" placeholder="媒体 URL（photo/document/animation 使用）">
-          <select id="parse_mode" class="border rounded-md px-3 py-2">
-            <option value="">ParseMode: None</option>
-            <option value="MarkdownV2">MarkdownV2</option>
-            <option value="HTML">HTML</option>
-          </select>
-          <label class="inline-flex items-center gap-2">
-            <input id="no_preview" type="checkbox"> <span class="text-sm text-gray-600">禁用链接预览</span>
-          </label>
-          <button onclick="saveCmd()" class="px-3 py-2 rounded-md bg-indigo-600 text-white md:col-start-6">添加/更新</button>
-          <button onclick="eraseAll()" class="px-3 py-2 rounded-md bg-gray-200 md:col-start-6">清空</button>
+        <div class="flex flex-wrap gap-2 mb-4 border-b border-gray-100 pb-3">
+          <button data-panel="commands" class="panel-tab active">固定指令</button>
+          <button data-panel="flows" class="panel-tab">流程编排</button>
+          <button data-panel="pseudo" class="panel-tab">中文伪代码</button>
+          <button data-panel="pro" class="panel-tab">专业模式</button>
         </div>
-        <script>
-        const kindSel = document.getElementById('kind');
-        const mediaUrl = document.getElementById('media_url');
-        kindSel.addEventListener('change', ()=>{
-          const k = kindSel.value;
-          mediaUrl.classList.toggle('hidden', k==='text');
-        });
-        </script>
 
-        <table class="w-full text-sm">
-          <thead><tr class="text-left text-gray-500"><th class="py-2 w-48">指令</th><th>回复</th><th class="w-24">操作</th></tr></thead>
-          <tbody id="cmd_table"></tbody>
-        </table>
-        <div id="status" class="text-sm text-gray-600 mt-2"></div>
+        <div id="panel-commands" class="panel-surface">
+          <details class="rounded-xl border border-gray-200 bg-gray-50 p-4" open>
+            <summary class="flex items-center justify-between cursor-pointer select-none text-sm font-medium text-gray-700">
+              <span>添加或更新固定指令</span>
+              <span class="text-xs text-gray-400">填写后点击下方保存</span>
+            </summary>
+            <div class="grid md:grid-cols-6 gap-2 mt-3 items-center">
+              <input id="cmd" class="border rounded-md px-3 py-2 w-full md:col-span-2" placeholder="/ping">
+              <select id="kind" class="border rounded-md px-3 py-2">
+                <option value="text">文本</option>
+                <option value="photo">图片</option>
+                <option value="document">文档</option>
+                <option value="animation">动画/GIF</option>
+              </select>
+              <input id="reply" class="border rounded-md px-3 py-2 md:col-span-3" placeholder="文本：支持 {{args}} 等变量；媒体：可做 caption">
+              <input id="media_url" class="border rounded-md px-3 py-2 md:col-span-3 hidden" placeholder="媒体 URL（photo/document/animation 使用）">
+              <select id="parse_mode" class="border rounded-md px-3 py-2">
+                <option value="">ParseMode: None</option>
+                <option value="MarkdownV2">MarkdownV2</option>
+                <option value="HTML">HTML</option>
+              </select>
+              <label class="inline-flex items-center gap-2">
+                <input id="no_preview" type="checkbox"> <span class="text-sm text-gray-600">禁用链接预览</span>
+              </label>
+              <button onclick="saveCmd()" class="px-3 py-2 rounded-md bg-indigo-600 text-white md:col-start-6">保存 / 更新</button>
+              <button onclick="eraseAll()" class="px-3 py-2 rounded-md bg-gray-200 md:col-start-6">清空全部</button>
+            </div>
+          </details>
+          <div class="flex flex-col md:flex-row gap-2 mt-4 mb-2">
+            <input id="cmd_ai_prompt" class="flex-1 border rounded-md px-3 py-2" placeholder="用一句话描述想要的指令，例如：欢迎访客">
+            <button onclick="aiGenerateCommand()" class="px-3 py-2 rounded-md bg-purple-600 text-white transition hover:-translate-y-0.5 hover:shadow">AI 生成指令</button>
+          </div>
+          <p class="text-xs text-gray-400 mb-3">提示：若已配置 <code>DEEPSEEK_API_KEY</code> 或 <code>AI_API_KEY</code>，将调用 DeepSeek AI；否则使用内置模板。</p>
+          <div id="cmd_cards" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"></div>
+        </div>
+         <div id="panel-pro" class="panel-surface hidden">
+          <details class="rounded-xl border border-gray-200 bg-gray-50 p-4" open>
+            <summary class="flex items-center justify-between cursor-pointer select-none text-sm font-medium text-gray-700">
+              <span>编写 Python 脚本 (Pro)</span>
+              <span class="text-xs text-gray-400">直接控制 bot, update, context 对象</span>
+            </summary>
+            <div class="grid md:grid-cols-4 gap-3 mt-3">
+              <input id="pro_name" class="border rounded-md px-3 py-2 md:col-span-2" placeholder="脚本名称，例如：每日简报">
+              <input id="pro_command" class="border rounded-md px-3 py-2 md:col-span-2" placeholder="触发命令，例如：/daily">
+              <textarea id="pro_code" class="code-editor border rounded-md px-3 py-2 md:col-span-4 h-48" placeholder="# 你的代码会包装在 async def handler(bot, update, context, log) 中&#10;# log('hello')&#10;await update.message.reply_text(f'Hello, {update.effective_user.first_name}')"></textarea>
+              <input type="hidden" id="pro_id">
+              <div class="flex items-center justify-between md:col-span-4">
+                <label class="inline-flex items-center gap-2"><input id="pro_active" type="checkbox" checked> <span class="text-sm text-gray-600">启用</span></label>
+                <div class="flex gap-2">
+                  <button onclick="saveProScript()" class="px-4 py-2 rounded-md bg-indigo-600 text-white">保存脚本</button>
+                  <button onclick="resetProForm()" class="px-3 py-2 rounded-md bg-gray-200">清空表单</button>
+                </div>
+              </div>
+            </div>
+          </details>
+          <div id="pro_status" class="text-sm text-gray-600 my-3"></div>
+          <table class="w-full text-sm">
+            <thead><tr class="text-left text-gray-500"><th class="py-2 w-32">名称</th><th class="w-32">命令</th><th>代码摘要</th><th class="w-24">状态</th><th class="w-32">操作</th></tr></thead>
+            <tbody id="pro_scripts_table"></tbody>
+          </table>
+        </div>
+        <div id="panel-flows" class="panel-surface hidden">
+          <details class="rounded-xl border border-gray-200 bg-gray-50 p-4" open>
+            <summary class="flex items-center justify-between cursor-pointer select-none text-sm font-medium text-gray-700">
+              <span>流程操作</span>
+              <span class="text-xs text-gray-400">管理 Blockly 流程编排</span>
+            </summary>
+            <div class="flex flex-wrap gap-2 mt-3">
+              <button onclick="openBlocks()" class="px-3 py-1.5 rounded-md bg-amber-500 text-white transition hover:-translate-y-0.5 hover:shadow">打开 Blockly 编辑器</button>
+              <button onclick="publishFlows()" class="px-3 py-1.5 rounded-md bg-gray-800 text-white transition hover:-translate-y-0.5 hover:shadow">发布 / 重载</button>
+            </div>
+          </details>
+          <p class="text-xs text-gray-400 mt-3 mb-3">提示：Blockly 中保存后会回写到数据库，再点击“发布”即可让运行中的 Bot 重载最新流程。</p>
+          <div id="flow_cards" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"></div>
+        </div>
+
+        <div id="panel-pseudo" class="panel-surface hidden">
+          <details class="rounded-xl border border-gray-200 bg-gray-50 p-4" open>
+            <summary class="flex items-center justify-between cursor-pointer select-none text-sm font-medium text-gray-700">
+              <span>编写 / 编辑中文伪代码</span>
+              <span class="text-xs text-gray-400">支持 AI 生成与沙盒演练</span>
+            </summary>
+            <div class="grid md:grid-cols-4 gap-3 mt-3">
+              <input id="pseudo_title" class="border rounded-md px-3 py-2 md:col-span-1" placeholder="标题，例如：欢迎流程伪代码">
+              <textarea id="pseudo_content" class="border rounded-md px-3 py-2 md:col-span-3 h-32" placeholder="使用中文伪代码描述 Bot 行为，例如：
+1. 用户发送 /start
+2. 机器人发送欢迎文本..." ></textarea>
+              <input type="hidden" id="pseudo_id">
+              <div class="flex gap-2 md:col-start-4">
+                <button onclick="savePseudocode()" class="flex-1 px-3 py-2 rounded-md bg-indigo-600 text-white">保存/更新伪代码</button>
+                <button onclick="resetPseudoForm()" class="px-3 py-2 rounded-md bg-gray-200">清空</button>
+              </div>
+            </div>
+          </details>
+          <div class="flex flex-col md:flex-row gap-2 mb-3">
+            <input id="pseudo_ai_prompt" class="flex-1 border rounded-md px-3 py-2" placeholder="输入需求，例如：生成欢迎流程">
+            <button onclick="aiGeneratePseudo()" class="px-3 py-2 rounded-md bg-purple-600 text-white transition hover:-translate-y-0.5 hover:shadow">AI 生成伪代码</button>
+          </div>
+          <p class="text-xs text-gray-400 mb-3">提示：若已配置 <code>DEEPSEEK_API_KEY</code> 或 <code>AI_API_KEY</code>，将调用 DeepSeek AI；否则使用离线模板快速填充。</p>
+          <div id="pseudo_status" class="text-sm text-gray-600 mb-3"></div>
+          <div class="flex flex-col md:flex-row gap-2 mb-3">
+            <input id="sandbox_input" class="flex-1 border rounded-md px-3 py-2" placeholder="沙盒模拟输入，例如：/start 或 1">
+            <button onclick="sandboxPseudo(document.getElementById('pseudo_id').value||null)" class="px-3 py-2 rounded-md bg-slate-800 text-white transition hover:-translate-y-0.5 hover:shadow">对当前内容沙盒演练</button>
+          </div>
+          <table class="w-full text-sm">
+            <thead><tr class="text-left text-gray-500"><th class="py-2 w-16">ID</th><th class="w-48">标题</th><th>内容摘要</th><th class="w-48">操作</th></tr></thead>
+            <tbody id="pseudocode_table"></tbody>
+          </table>
+          <div class="mt-4">
+            <h4 class="text-sm font-medium text-gray-600 mb-2">沙盒演练输出</h4>
+            <pre id="sandbox_output" class="hidden bg-slate-900 text-sky-200 text-xs rounded-lg p-3 leading-5 whitespace-pre-wrap"></pre>
+          </div>
+        </div>
+
+        <div id="status" class="text-sm text-gray-600 mt-4"></div>
       </div>
 
-      <!-- 流程列表 -->
+      <!-- 程序总览 -->
       <div class="bg-white rounded-xl shadow p-6">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="font-medium text-lg">流程列表</h2>
-          <div class="space-x-2">
-            <button onclick="openBlocks()" class="px-3 py-1.5 rounded-md bg-amber-500 text-white">新建/编辑</button>
-            <button onclick="publishFlows()" class="px-3 py-1.5 rounded-md bg-gray-800 text-white">发布（重载）</button>
+          <h2 class="font-medium text-lg">程序总览</h2>
+          <div class="flex items-center gap-2 text-sm">
+            <span class="text-gray-400">快速复查指令 / 流程 / 伪代码</span>
+            <button onclick="refreshOverview()" class="px-3 py-1.5 rounded-md bg-gray-200 hover:bg-gray-300">刷新</button>
           </div>
         </div>
-        <table class="w-full text-sm">
-          <thead><tr class="text-left text-gray-500">
-            <th class="py-2 w-16">ID</th><th>名称</th><th class="w-16">启用</th><th class="w-32">操作</th>
-          </tr></thead>
-          <tbody id="flow_table"></tbody>
-        </table>
+        <div id="overview_content" class="space-y-4 text-sm text-gray-700">
+          <div class="text-gray-500">暂无数据，请先选择 Bot 并加载配置。</div>
+        </div>
       </div>
 
       <!-- 运行监控 -->
@@ -149,7 +265,206 @@
   </div>
 
 <script>
-let currentUser=null, currentBotId=null;
+let currentUser=null, currentBotId=null, pseudoCache={};
+let _statusTimer = null, _cardsTimer = null;
+let _loadBotsPending = false;
+let commandsCache=[], flowsCache=[], pseudocodeCache=[];
+let proScriptsCache = [];
+const fmt = {
+  time(seconds){
+    const sec = Number(seconds||0);
+    const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+    return `${h}h ${m}m ${s}s`;
+  },
+  date(ts){
+    if(!ts) return '-';
+    try{
+      return new Date(ts).toLocaleString();
+    }catch(e){
+      return ts;
+    }
+  }
+};
+
+function escapeHtml(str=''){
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+
+function prettyJson(obj){
+  try{
+    if(typeof obj === 'string'){
+      const parsed = JSON.parse(obj);
+      return JSON.stringify(parsed, null, 2);
+    }
+    return JSON.stringify(obj, null, 2);
+  }catch(e){
+    return String(obj);
+  }
+}
+
+function parseMaybeJson(raw){
+  if(!raw) return null;
+  if(typeof raw === 'object') return raw;
+  try{ return JSON.parse(raw); }catch(e){ return null; }
+}
+
+function parseFlowCompiled(raw){
+  if(!raw) return null;
+  let data = raw;
+  if(typeof data === 'string'){
+    try { data = JSON.parse(data); } catch(e){ return null; }
+    if(typeof data === 'string'){
+      try { data = JSON.parse(data); } catch(e){ return null; }
+    }
+  }
+  return (data && typeof data === 'object') ? data : null;
+}
+
+let botsCache=[];
+
+function toggleDetails(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.classList.toggle('hidden');
+  el.classList.toggle('animate-card');
+}
+
+const panelSections = {
+  commands: () => document.getElementById('panel-commands'),
+  flows: () => document.getElementById('panel-flows'),
+  pro: () => document.getElementById('panel-pro'), // 新增
+  pseudo: () => document.getElementById('panel-pseudo'),
+};
+
+const panelTabs = Array.from(document.querySelectorAll('[data-panel]'));
+let activePanel = 'commands';
+
+function setActivePanel(name){
+  if(!panelSections[name]) return;
+  activePanel = name;
+  Object.keys(panelSections).forEach(key => {
+    const section = panelSections[key]();
+    if(!section) return;
+    if(key === name){
+      section.classList.remove('hidden');
+      section.classList.add('animate-card');
+    } else {
+      section.classList.add('hidden');
+    }
+  });
+  panelTabs.forEach(btn => {
+    const target = btn.dataset.panel;
+    if(target === name){
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
+
+function commandPseudo(cmd){
+  const lines = [];
+  lines.push(`当用户发送 ${cmd.command || ''}`);
+  const kind = (cmd.kind || 'text').toLowerCase();
+  if(kind === 'text'){
+    const body = (cmd.reply || '').trim();
+    lines.push(`  - 机器人回复文本「${body || '...'}」`);
+    if(cmd.parse_mode){
+      lines.push(`  - 使用 ParseMode=${cmd.parse_mode}`);
+    }
+    if(cmd.disable_preview){
+      lines.push('  - 禁用链接预览');
+    }
+  } else if(['photo','document','animation','voice'].includes(kind)){
+    const payload = parseMaybeJson(cmd.payload) || {};
+    const url = payload.url || payload.file_id || '';
+    const caption = payload.caption || cmd.reply || '';
+    const mediaLabel = {photo:'图片', document:'文档', animation:'动画', voice:'语音'}[kind] || kind;
+    lines.push(`  - 机器人发送${mediaLabel} ${url ? `(${url})` : ''}`.trim());
+    if(caption){
+      lines.push(`  - 附带说明「${caption}」`);
+    }
+  } else {
+    lines.push(`  - 机器人执行 ${kind} 类型动作`);
+  }
+  return lines.join('\n');
+}
+
+function describeFlowNode(node){
+  if(!node) return '  - ...(未知节点)';
+  const t = node.type;
+  switch(t){
+    case 'send_text':
+      return `  - 发送文本「${(node.text||'').slice(0,32)}」`;
+    case 'send_photo':
+      return `  - 发送图片 ${node.url ? '('+node.url+')' : ''}`.trim();
+    case 'send_document':
+      return `  - 发送文档 ${node.url ? '('+node.url+')' : ''}`.trim();
+    case 'send_animation':
+      return `  - 发送动画/GIF ${node.url ? '('+node.url+')' : ''}`.trim();
+    case 'send_voice':
+      return `  - 发送语音 ${node.url ? '('+node.url+')' : ''}`.trim();
+    case 'send_sticker':
+      return `  - 发送贴纸 ${node.file_id ? '('+node.file_id+')' : ''}`.trim();
+    case 'send_text_keyboard':
+      return '  - 发送文本并附带按钮';
+    case 'set_var':
+      if((node.mode||'')==='random'){
+        const r = node.random || {};
+        const rMin = r.min != null ? r.min : 1;
+        const rMax = r.max != null ? r.max : 100;
+        return `  - 设置 ${node.scope||'chat'} 变量 ${node.key||'k'} 为随机 ${rMin}~${rMax}`;
+      }
+      return `  - 设置 ${node.scope||'chat'} 变量 ${node.key||'k'} = ${node.value||''}`;
+    case 'inc_var':
+      return `  - ${node.scope||'chat'} 变量 ${node.key||'count'} += ${node.step||1}`;
+    case 'get_var':
+      return `  - 读取 ${node.scope||'chat'} 变量 ${node.key||'k'} → ${node.alias||'x'}`;
+    case 'set_local_from_input':
+      return `  - 将输入文本保存到临时变量 ${node.alias||'x'}`;
+    case 'if_var':
+      const leftVar = (node.left && node.left.var) || 'x';
+      const rightText = (node.right && node.right.text) || '';
+      return `  - 条件判断：local.${leftVar} ${node.op||'eq'} ${rightText}`;
+    case 'wait_next':
+      return `  - 等待下一条消息（期望${node.expect==='number'?'数字':'任意'}），提示「${node.prompt||''}」`;
+    case 'http':
+      return `  - 请求 ${node.method||'GET'} ${node.url||''}`;
+    case 'delay':
+      return `  - 延迟 ${node.seconds||0} 秒后继续`;
+    default:
+      return `  - 节点 ${t}`;
+  }
+}
+
+function flowPseudo(compiled){
+  if(!compiled || !Array.isArray(compiled.entries)) return '暂无伪代码，请先保存流程。';
+  const lines = [];
+  for(const entry of compiled.entries){
+    const cmd = entry.command || entry.name || '入口';
+    lines.push(`当触发 ${cmd}：`);
+    const nodes = entry.nodes || [];
+    if(!nodes.length){
+      lines.push('  - （无动作）');
+    } else {
+      nodes.forEach(n => {
+        lines.push(describeFlowNode(n));
+        if(n.type === 'if_var'){
+          (n.then||[]).forEach(child => lines.push('    THEN ' + describeFlowNode(child).replace(/^\s+-\s+/, '')));
+          (n.else||[]).forEach(child => lines.push('    ELSE ' + describeFlowNode(child).replace(/^\s+-\s+/, '')));
+        }
+        if(n.type === 'wait_next'){
+          (n.next||[]).forEach(child => lines.push('    NEXT ' + describeFlowNode(child).replace(/^\s+-\s+/, '')));
+        }
+      });
+    }
+    lines.push('');
+  }
+  return lines.join('\n');
+}
 
 async function me(){
   const r=await fetch('/api/me',{credentials:'same-origin'}); const j=await r.json();
@@ -158,7 +473,10 @@ async function me(){
   document.getElementById('app').classList.toggle('hidden', !currentUser);
   if(currentUser){
     document.getElementById('welcome').innerText=`你好，${currentUser.username}`;
-    loadBots();
+    await loadBots();
+    startBotCardTimer();
+  } else {
+    stopBotCardTimer();
   }
 }
 async function registerUser(){
@@ -175,22 +493,255 @@ async function login(){
 }
 async function logout(){ await fetch('/api/logout',{method:'POST',credentials:'same-origin'}); location.reload(); }
 
-async function loadBots(){
-  const r=await fetch('/api/bots',{credentials:'same-origin'}); const j=await r.json();
-  const tb=document.getElementById('bot_table'); tb.innerHTML='';
-  (j.items||[]).forEach(b=>{
-    const tr=document.createElement('tr'); tr.className='border-t';
-    tr.innerHTML=`<td class="py-2">${b.id}</td>
-      <td>${b.name}</td><td class="text-gray-500">${b.token_mask}</td>
-      <td class="space-x-2">
-        <button class="text-indigo-600" onclick="selectBot(${b.id},'${b.name.replaceAll("'","\\'")}')">选择</button>
-        <button class="text-red-600" onclick="delBot(${b.id})">删除</button>
-      </td>`;
-    tb.appendChild(tr);
-  });
-  if(j.items && j.items.length && !currentBotId){
-    selectBot(j.items[0].id, j.items[0].name);
+function startBotCardTimer(){
+  if(_cardsTimer) clearInterval(_cardsTimer);
+  _cardsTimer = setInterval(()=>{
+    if(currentUser){
+      loadBots();
+    }
+  }, 8000);
+}
+
+function stopBotCardTimer(){
+  if(_cardsTimer){
+    clearInterval(_cardsTimer);
+    _cardsTimer = null;
   }
+}
+
+async function loadBots(){
+  if(_loadBotsPending) return botsCache;
+  _loadBotsPending = true;
+  try {
+    const [botsRes, statusRes] = await Promise.all([
+    fetch('/api/bots',{credentials:'same-origin'}),
+    fetch('/api/bots/status_all',{credentials:'same-origin'})
+    ]);
+    const botsJson = await botsRes.json();
+    const statusJson = await statusRes.json();
+    const bots = botsJson.items || [];
+    const statusItems = statusJson.items || [];
+    const statusMap = {};
+    statusItems.forEach(s => { statusMap[s.bot_id] = s; });
+    renderBotCards(bots, statusMap);
+
+    if(bots.length){
+      const existing = bots.find(b => Number(b.id) === Number(currentBotId));
+      if(existing){
+        document.getElementById('current_bot').innerText=`（当前：${existing.name} #${existing.id}）`;
+        highlightSelectedBot(existing.id);
+      } else {
+        selectBot(bots[0].id, bots[0].name);
+      }
+    } else {
+      currentBotId = null;
+      document.getElementById('current_bot').innerText='';
+      document.getElementById('cmd_cards').innerHTML='';
+      document.getElementById('flow_cards').innerHTML='';
+      document.getElementById('runtime_summary').innerHTML='';
+      document.getElementById('status_table').innerHTML='';
+      commandsCache = [];
+      flowsCache = [];
+      pseudocodeCache = [];
+      updateOverview();
+    }
+    return bots;
+  } finally {
+    _loadBotsPending = false;
+  }
+}
+
+function renderBotCards(bots, statusMap){
+  botsCache = bots;
+  const wrap = document.getElementById('bot_cards');
+  wrap.innerHTML = '';
+  if(!bots.length){
+    wrap.innerHTML = '<div class="text-sm text-gray-500">暂无 Bot，请先创建。</div>';
+    return;
+  }
+  bots.forEach((bot, idx) => {
+    const snap = statusMap[bot.id] || {};
+    const card = document.createElement('div');
+    card.className = 'bot-card animate-card rounded-2xl border border-gray-100 bg-gradient-to-br from-white via-white to-gray-50 shadow transition-all duration-300 hover:-translate-y-1 hover:shadow-xl';
+    card.dataset.botId = bot.id;
+    const state = snap.state || 'stopped';
+    const stats = snap.stats || {messages:0, errors:0};
+    card.innerHTML = `
+      <div class="p-5 h-full flex flex-col gap-4" onclick="selectBot(${bot.id}, '${bot.name.replaceAll("'","\\'")}')">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-lg font-semibold text-gray-800">${escapeHtml(bot.name)}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">ID ${bot.id}</span>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">Token: ${escapeHtml((statusMap[bot.id] && statusMap[bot.id].token_mask) || bot.token_mask || '')}</p>
+          </div>
+          <div class="text-sm">${badge(state)}</div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 text-sm text-gray-600">
+          <div>
+            <div class="text-xs text-gray-400">运行时长</div>
+            <div class="font-medium">${fmt.time(snap.uptime)}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-400">消息 / 错误</div>
+            <div class="font-medium">${stats.messages||0} / ${stats.errors||0}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-400">固定指令</div>
+            <div class="font-medium">${snap.specs_count||0}</div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-400">流程数</div>
+            <div class="font-medium">${snap.flows_count||0}</div>
+          </div>
+        </div>
+        <div class="mt-auto flex flex-wrap gap-2 text-sm">
+          <button class="px-3 py-1.5 rounded-md bg-indigo-600 text-white transition hover:opacity-90" onclick="event.stopPropagation(); selectBot(${bot.id}, '${bot.name.replaceAll("'","\\'")}')">详情</button>
+          <button class="px-3 py-1.5 rounded-md bg-emerald-500 text-white transition hover:opacity-90" onclick="event.stopPropagation(); currentBotId=${bot.id}; startBot();">启动</button>
+          <button class="px-3 py-1.5 rounded-md bg-gray-700 text-white transition hover:opacity-90" onclick="event.stopPropagation(); currentBotId=${bot.id}; stopBot();">停止</button>
+          <button class="px-3 py-1.5 rounded-md bg-gray-200 transition hover:bg-gray-300" onclick="event.stopPropagation(); currentBotId=${bot.id}; syncMenu();">同步菜单</button>
+          <button class="px-3 py-1.5 rounded-md bg-red-50 text-red-600 transition hover:bg-red-100" onclick="event.stopPropagation(); delBot(${bot.id});">删除</button>
+        </div>
+      </div>
+    `;
+  wrap.appendChild(card);
+  });
+  highlightSelectedBot(currentBotId);
+}
+
+function updateOverview(){
+  const wrap = document.getElementById('overview_content');
+  if(!wrap) return;
+  const total = commandsCache.length + flowsCache.length + pseudocodeCache.length;
+  if(total === 0){
+    wrap.innerHTML = '<div class="text-gray-500">暂无数据，请先加载 Bot 配置。</div>';
+    return;
+  }
+  const summary = `
+    <div class="grid md:grid-cols-3 gap-3 text-xs text-gray-500 mb-3">
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <div class="text-xs uppercase tracking-wide text-gray-400">固定指令</div>
+        <div class="text-lg font-semibold text-gray-800">${commandsCache.length}</div>
+      </div>
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <div class="text-xs uppercase tracking-wide text-gray-400">流程编排</div>
+        <div class="text-lg font-semibold text-gray-800">${flowsCache.length}</div>
+      </div>
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <div class="text-xs uppercase tracking-wide text-gray-400">中文伪代码</div>
+        <div class="text-lg font-semibold text-gray-800">${pseudocodeCache.length}</div>
+      </div>
+    </div>`;
+
+  const sections = [summary];
+
+  if(commandsCache.length){
+    const cmdList = commandsCache.slice(0,5).map(cmd => {
+      const pseudo = commandPseudo(cmd);
+      const codeData = {
+        command: cmd.command,
+        kind: cmd.kind,
+        reply: cmd.reply,
+        parse_mode: cmd.parse_mode,
+        disable_preview: cmd.disable_preview,
+        payload: cmd.payload,
+      };
+      return `
+        <details class="rounded-lg border border-gray-200 bg-white/70 p-3">
+          <summary class="flex items-center justify-between text-sm font-medium text-gray-700 cursor-pointer select-none">
+            <span>${escapeHtml(cmd.command)}</span>
+            <span class="text-xs text-gray-400">${escapeHtml(cmd.kind || 'text')}</span>
+          </summary>
+          <div class="grid md:grid-cols-2 gap-3 mt-2 text-xs">
+            <div>
+              <div class="text-gray-400 mb-1">伪代码</div>
+              <pre class="bg-amber-50 text-amber-900 rounded-lg p-3 whitespace-pre-wrap">${escapeHtml(pseudo)}</pre>
+            </div>
+            <div>
+              <div class="text-gray-400 mb-1">JSON</div>
+              <pre class="bg-slate-900 text-emerald-300 rounded-lg p-3 overflow-auto max-h-44">${escapeHtml(prettyJson(codeData))}</pre>
+            </div>
+          </div>
+        </details>`;
+    }).join('');
+    sections.push(`
+      <section class="space-y-2">
+        <h3 class="text-sm font-semibold text-gray-600">固定指令概览</h3>
+        ${cmdList}
+        ${commandsCache.length>5 ? '<p class="text-xs text-gray-400">仅展示前 5 条，其余请在上方面板查看。</p>' : ''}
+      </section>`);
+  }
+
+  if(flowsCache.length){
+    const flowList = flowsCache.slice(0,5).map(flow => {
+      const pseudo = flowPseudo(flow.compiled || {});
+      return `
+        <details class="rounded-lg border border-gray-200 bg-white/70 p-3">
+          <summary class="flex items-center justify-between text-sm font-medium text-gray-700 cursor-pointer select-none">
+            <span>${escapeHtml(flow.name)}</span>
+            <span class="text-xs text-gray-400">${flow.active ? '启用' : '停用'}</span>
+          </summary>
+          <div class="grid md:grid-cols-2 gap-3 mt-2 text-xs">
+            <div>
+              <div class="text-gray-400 mb-1">伪代码</div>
+              <pre class="bg-amber-50 text-amber-900 rounded-lg p-3 whitespace-pre-wrap">${escapeHtml(pseudo)}</pre>
+            </div>
+            <div>
+              <div class="text-gray-400 mb-1">节点 JSON</div>
+              <pre class="bg-slate-900 text-sky-200 rounded-lg p-3 overflow-auto max-h-44">${escapeHtml(prettyJson(flow.compiled || {}))}</pre>
+            </div>
+          </div>
+        </details>`;
+    }).join('');
+    sections.push(`
+      <section class="space-y-2">
+        <h3 class="text-sm font-semibold text-gray-600">流程编排概览</h3>
+        ${flowList}
+        ${flowsCache.length>5 ? '<p class="text-xs text-gray-400">仅展示前 5 条，其余请在上方面板查看。</p>' : ''}
+      </section>`);
+  }
+
+  if(pseudocodeCache.length){
+    const pseudoList = pseudocodeCache.slice(0,5).map(item => {
+      const preview = (item.content || '').split('\n').slice(0,6).join('\n');
+      return `
+        <details class="rounded-lg border border-gray-200 bg-white/70 p-3">
+          <summary class="flex items-center justify-between text-sm font-medium text-gray-700 cursor-pointer select-none">
+            <span>${escapeHtml(item.title || '未命名伪代码')}</span>
+            <span class="text-xs text-gray-400">ID ${item.id}</span>
+          </summary>
+          <div class="mt-2 text-xs text-gray-600 whitespace-pre-wrap bg-amber-50 text-amber-900 rounded-lg p-3">${escapeHtml(preview)}</div>
+        </details>`;
+    }).join('');
+    sections.push(`
+      <section class="space-y-2">
+        <h3 class="text-sm font-semibold text-gray-600">中文伪代码概览</h3>
+        ${pseudoList}
+        ${pseudocodeCache.length>5 ? '<p class="text-xs text-gray-400">仅展示前 5 条，其余请在上方面板查看。</p>' : ''}
+      </section>`);
+  }
+
+  wrap.innerHTML = sections.join('');
+}
+
+async function refreshOverview(){
+  if(!currentBotId){
+    alert('请先选择一个 Bot');
+    return;
+  }
+  await Promise.all([loadCmds(), loadFlows(), loadPseudocode()]);
+}
+
+function highlightSelectedBot(id){
+  const cards = document.querySelectorAll('.bot-card');
+  cards.forEach(card => {
+    if(id != null && Number(card.dataset.botId) === Number(id)){
+      card.classList.add('ring','ring-indigo-400','shadow-2xl');
+    }else{
+      card.classList.remove('ring','ring-indigo-400','shadow-2xl');
+    }
+  });
 }
 
 async function addBot(){
@@ -206,35 +757,167 @@ async function addBot(){
 async function delBot(id){
   if(!confirm('确认删除该 bot？')) return;
   const r=await fetch('/api/bots/'+id,{method:'DELETE',credentials:'same-origin'}); const j=await r.json();
-  if(!j.ok) alert(j.error||'失败'); currentBotId=null; loadBots(); document.getElementById('cmd_table').innerHTML='';
+  if(!j.ok) alert(j.error||'失败');
+  currentBotId=null;
   document.getElementById('current_bot').innerText='';
+  document.getElementById('cmd_cards').innerHTML='';
+  document.getElementById('flow_cards').innerHTML='';
+  loadBots();
 }
 
 /* --------- 选中 bot：加载数据 + 启动轮询 --------- */
-let _statusTimer = null;
 function selectBot(id, name){
   currentBotId=id;
   document.getElementById('current_bot').innerText=`（当前：${name} #${id}）`;
+  highlightSelectedBot(id);
   loadCmds();
   loadFlows();
+  loadProScripts(); // 新增
+  resetPseudoForm();
+  loadPseudocode();
   refreshStatus();
   if(_statusTimer) clearInterval(_statusTimer);
   _statusTimer = setInterval(refreshStatus, 3000);
 }
-window.addEventListener('beforeunload', ()=>{ if(_statusTimer) clearInterval(_statusTimer); });
+window.addEventListener('beforeunload', ()=>{
+  if(_statusTimer) clearInterval(_statusTimer);
+  if(_cardsTimer) clearInterval(_cardsTimer);
+});
 
 /* ---------- 指令 ---------- */
+function resetProForm(){
+  document.getElementById('pro_id').value = '';
+  document.getElementById('pro_name').value = '';
+  document.getElementById('pro_command').value = '';
+  document.getElementById('pro_code').value = '';
+  document.getElementById('pro_active').checked = true;
+  document.getElementById('pro_status').innerText = '';
+}
+
+async function loadProScripts() {
+    if(!currentBotId) return;
+    const r = await fetch(`/api/bots/${currentBotId}/pro_scripts`, { credentials: 'same-origin' });
+    const j = await r.json();
+    const tb = document.getElementById('pro_scripts_table');
+    tb.innerHTML = '';
+    proScriptsCache = j.items || [];
+
+    proScriptsCache.forEach(it => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-t';
+        const excerpt = (it.code || '').split('\n')[0].slice(0, 50) + '...';
+        tr.innerHTML = `<td class="py-2">${escapeHtml(it.name)}</td>
+            <td><code>${escapeHtml(it.command)}</code></td>
+            <td class="text-gray-500"><code>${escapeHtml(excerpt)}</code></td>
+            <td><span class="text-xs px-2 py-0.5 rounded-full ${it.active ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'}">${it.active ? '启用' : '停用'}</span></td>
+            <td class="space-x-2">
+                <button class="text-sm text-indigo-600" onclick="editProScript(${it.id})">编辑</button>
+                <button class="text-sm text-red-600" onclick="deleteProScript(${it.id})">删除</button>
+            </td>`;
+        tb.appendChild(tr);
+    });
+}
+
+function editProScript(id) {
+    const script = proScriptsCache.find(s => s.id === id);
+    if (!script) return;
+    document.getElementById('pro_id').value = script.id;
+    document.getElementById('pro_name').value = script.name;
+    document.getElementById('pro_command').value = script.command;
+    document.getElementById('pro_code').value = script.code;
+    document.getElementById('pro_active').checked = !!script.active;
+    document.getElementById('pro_status').innerText = `✏️ 编辑脚本: ${script.name}`;
+    setActivePanel('pro');
+}
+
+async function saveProScript() {
+    if (!currentBotId) { alert('请先选择一个 Bot'); return; }
+    const id = document.getElementById('pro_id').value || undefined;
+    const payload = {
+        name: document.getElementById('pro_name').value,
+        command: document.getElementById('pro_command').value,
+        code: document.getElementById('pro_code').value,
+        active: document.getElementById('pro_active').checked,
+    };
+    if (id) payload.id = Number(id);
+
+    const r = await fetch(`/api/bots/${currentBotId}/pro_scripts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+    });
+    const j = await r.json();
+    const statusEl = document.getElementById('pro_status');
+    statusEl.innerText = j.ok ? '✅ 脚本已保存。重启/重载 Bot 后生效。' : `❌ 保存失败: ${j.error || '未知错误'}`;
+    if (j.ok) {
+        resetProForm();
+        loadProScripts();
+    }
+}
+
+async function deleteProScript(id) {
+    if (!confirm('确定要删除这个脚本吗？')) return;
+    const r = await fetch(`/api/bots/${currentBotId}/pro_scripts/${id}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+    });
+    const j = await r.json();
+    const statusEl = document.getElementById('pro_status');
+    statusEl.innerText = j.ok ? '🗑️ 脚本已删除。' : `❌ 删除失败: ${j.error || '未知错误'}`;
+    loadProScripts();
+}
 async function loadCmds(){
   if(!currentBotId) return;
   const r=await fetch(`/api/bots/${currentBotId}/commands`,{credentials:'same-origin'}); const j=await r.json();
-  const tb=document.getElementById('cmd_table'); tb.innerHTML='';
-  (j.items||[]).forEach(it=>{
-    const tr=document.createElement('tr'); tr.className='border-t';
-    tr.innerHTML = `<td class="py-2">${it.command} <span class="text-gray-400">(${it.kind||'text'})</span></td>
-                    <td>${(it.reply||'').replaceAll('<','&lt;')}</td>
-                    <td><button class="text-red-600" onclick="delCmd('${it.command.replaceAll("'","\\'")}')">删除</button></td>`;
-    tb.appendChild(tr);
+  const wrap=document.getElementById('cmd_cards');
+  wrap.innerHTML='';
+  const items = j.items || [];
+  commandsCache = items.map(it => ({...it}));
+  if(!items.length){
+    wrap.innerHTML = '<div class="text-sm text-gray-500">暂无固定指令，先在上方添加一个吧～</div>';
+    updateOverview();
+    return;
+  }
+  items.forEach((it, idx)=>{
+    const payloadParsed = parseMaybeJson(it.payload) || {};
+    const card = document.createElement('div');
+    const domId = `${it.id||idx}`;
+    card.className='animate-card rounded-2xl border border-gray-100 bg-white shadow transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl';
+    const pseudo = commandPseudo({...it, payload: payloadParsed});
+    const codeJson = prettyJson({
+      command: it.command,
+      kind: it.kind,
+      reply: it.reply,
+      parse_mode: it.parse_mode,
+      disable_preview: it.disable_preview,
+      payload: payloadParsed
+    });
+    card.innerHTML = `
+      <div class="p-4 flex flex-col gap-3">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+              ${escapeHtml(it.command)}
+              <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">${escapeHtml(it.kind||'text')}</span>
+            </h3>
+            <p class="text-xs text-gray-400 mt-1">ParseMode: ${it.parse_mode || 'None'} ｜ 预览：${it.disable_preview? '关闭':'开启'}</p>
+          </div>
+          <button class="text-sm text-red-500 hover:text-red-600" onclick="delCmd('${it.command.replaceAll("'","\\'")}'); event.stopPropagation();">删除</button>
+        </div>
+        <div class="text-sm text-gray-600">
+          ${(it.reply || payloadParsed.text || '').slice(0,80) || '（无默认文本）'}
+        </div>
+        <div class="flex flex-wrap gap-2 text-xs">
+          <button class="px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200" onclick="toggleDetails('cmd-code-${domId}')">查看代码</button>
+          <button class="px-3 py-1.5 rounded-md bg-amber-100 hover:bg-amber-200" onclick="toggleDetails('cmd-pseudo-${domId}')">查看伪代码</button>
+        </div>
+        <pre id="cmd-code-${domId}" class="hidden bg-gray-900 text-emerald-200 rounded-lg p-3 text-xs overflow-auto max-h-48">${escapeHtml(codeJson)}</pre>
+        <pre id="cmd-pseudo-${domId}" class="hidden bg-amber-50 text-amber-900 rounded-lg p-3 text-xs leading-5 whitespace-pre-wrap">${escapeHtml(pseudo)}</pre>
+      </div>`;
+    wrap.appendChild(card);
   });
+  updateOverview();
 }
 
 async function saveCmd(){
@@ -275,16 +958,47 @@ async function eraseAll(){
   document.getElementById('status').innerText=j.ok?'🧹 已清空':'❌ 失败'; loadCmds();
 }
 
+async function aiGenerateCommand(){
+  if(!currentBotId){ alert('先选择一个 bot'); return; }
+  const prompt = document.getElementById('cmd_ai_prompt').value.trim();
+  const r = await fetch('/api/ai/generate', {
+    method:'POST',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ mode:'command', prompt })
+  });
+  const j = await r.json();
+  if(!j.ok){
+    document.getElementById('status').innerText = '❌ '+(j.error||'AI 生成指令失败');
+    return;
+  }
+  const result = j.result || {};
+  document.getElementById('cmd').value = result.command || '/auto';
+  document.getElementById('kind').value = result.kind || 'text';
+  document.getElementById('reply').value = result.reply || '';
+  document.getElementById('parse_mode').value = result.parse_mode || '';
+  document.getElementById('no_preview').checked = !!result.disable_preview;
+  const meta = j.meta || {};
+  let note = '🤖 已根据提示生成指令草稿，确认后点击保存。';
+  if(meta.api_key_configured === false){
+    note += '（当前使用离线模板，如需真实 AI，请配置 AI_API_KEY。）';
+  }
+  document.getElementById('status').innerText = note;
+  setActivePanel('commands');
+}
+
 /* ---------- 运行控制 ---------- */
 async function startBot(){
   const r=await fetch(`/api/bots/${currentBotId}/start`,{method:'POST',credentials:'same-origin'}); const j=await r.json();
   document.getElementById('status').innerText=j.ok?('🚀 '+j.msg):('❌ '+(j.error||j.msg));
   refreshStatus();
+  loadBots();
 }
 async function stopBot(){
   const r=await fetch(`/api/bots/${currentBotId}/stop`,{method:'POST',credentials:'same-origin'}); const j=await r.json();
   document.getElementById('status').innerText=j.ok?('🛑 '+j.msg):('❌ '+(j.error||j.msg));
   refreshStatus();
+  loadBots();
 }
 async function syncMenu(){
   const r=await fetch(`/api/bots/${currentBotId}/sync`,{method:'POST',credentials:'same-origin'}); const j=await r.json();
@@ -301,20 +1015,52 @@ async function loadFlows(){
   if(!currentBotId) return;
   const r = await fetch(`/api/bots/${currentBotId}/flows`, { credentials:'same-origin' });
   const j = await r.json();
-  const tb = document.getElementById('flow_table'); if(!tb) return;
-  tb.innerHTML = '';
-  (j.items||[]).forEach(f=>{
-    const tr = document.createElement('tr'); tr.className='border-t';
-    tr.innerHTML = `<td class="py-2">${f.id}</td>
-      <td>${f.name}</td>
-      <td>${f.active ? '✅' : '❌'}</td>
-      <td class="space-x-2">
-        <button class="text-indigo-600" onclick="openBlocks(${f.id})">编辑</button>
-        <button class="text-red-600" onclick="deleteFlow(${f.id})">删除</button>
-      </td>`;
-    tb.appendChild(tr);
+  const wrap = document.getElementById('flow_cards');
+  wrap.innerHTML = '';
+  const rawItems = j.items || [];
+  const items = rawItems.map(f => ({...f, compiled: f.blocks_compiled || parseFlowCompiled(f.blocks_json)}));
+  flowsCache = items;
+  if(!items.length){
+    wrap.innerHTML = '<div class="text-sm text-gray-500">暂无流程，点击右上角「新建/编辑」开始创建。</div>';
+    updateOverview();
+    return;
+  }
+  items.forEach((f, idx)=>{
+    const pseudo = flowPseudo(f.compiled);
+    const codeJson = f.compiled ? prettyJson(f.compiled) : prettyJson(f.blocks_json || {});
+    const card = document.createElement('div');
+    card.className = 'animate-card rounded-2xl border border-gray-100 bg-white shadow transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl';
+    const domId = `${f.id||idx}`;
+    card.innerHTML = `
+      <div class="p-4 flex flex-col gap-3">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+              ${escapeHtml(f.name)}
+              <span class="text-xs px-2 py-0.5 rounded-full ${f.active? 'bg-emerald-100 text-emerald-600':'bg-gray-100 text-gray-500'}">${f.active?'启用':'停用'}</span>
+            </h3>
+            <p class="text-xs text-gray-400 mt-1">更新：${fmt.date(f.updated_at || f.created_at)}</p>
+          </div>
+          <div class="flex flex-col gap-1 text-xs text-right text-gray-400">
+            <button class="text-indigo-600 hover:text-indigo-700" onclick="openBlocks(${f.id}); event.stopPropagation();">编辑</button>
+            <button class="text-red-500 hover:text-red-600" onclick="deleteFlow(${f.id}); event.stopPropagation();">删除</button>
+          </div>
+        </div>
+        <div class="text-sm text-gray-600 whitespace-pre-wrap max-h-24 overflow-hidden">
+          ${escapeHtml(pseudo.split('\n').slice(0,4).join('\n'))}${pseudo.split('\n').length>4?'\n...':''}
+        </div>
+        <div class="flex flex-wrap gap-2 text-xs">
+          <button class="px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200" onclick="toggleDetails('flow-code-${domId}')">查看代码</button>
+          <button class="px-3 py-1.5 rounded-md bg-amber-100 hover:bg-amber-200" onclick="toggleDetails('flow-pseudo-${domId}')">查看伪代码</button>
+        </div>
+        <pre id="flow-code-${domId}" class="hidden bg-gray-900 text-sky-200 rounded-lg p-3 text-xs overflow-auto max-h-56">${escapeHtml(codeJson)}</pre>
+        <pre id="flow-pseudo-${domId}" class="hidden bg-amber-50 text-amber-900 rounded-lg p-3 text-xs leading-5 whitespace-pre-wrap">${escapeHtml(pseudo)}</pre>
+      </div>`;
+    wrap.appendChild(card);
   });
+  updateOverview();
 }
+
 
 async function deleteFlow(flowId){
   if(!confirm('确认删除该流程？')) return;
@@ -329,13 +1075,178 @@ async function publishFlows(){
   const j = await r.json();
   document.getElementById('status').innerText = j.ok ? '🚀 已发布（重载）' : ('❌ '+(j.error||j.msg));
   refreshStatus();
+  loadBots();
+}
+
+/* ---------- 伪代码（中文） ---------- */
+function resetPseudoForm(){
+  document.getElementById('pseudo_id').value='';
+  document.getElementById('pseudo_title').value='';
+  document.getElementById('pseudo_content').value='';
+  document.getElementById('pseudo_status').innerText='';
+}
+
+async function loadPseudocode(){
+  if(!currentBotId) return;
+  const r = await fetch(`/api/bots/${currentBotId}/pseudocode`, { credentials:'same-origin' });
+  const j = await r.json();
+  const tb = document.getElementById('pseudocode_table');
+  tb.innerHTML='';
+  pseudoCache = {};
+  const sandboxBox = document.getElementById('sandbox_output');
+  if(sandboxBox){ sandboxBox.classList.add('hidden'); sandboxBox.textContent=''; }
+  const items = (j.items||[]).map(it => ({...it}));
+  pseudocodeCache = items;
+  items.forEach(it=>{
+    pseudoCache[it.id] = it;
+    const tr = document.createElement('tr'); tr.className='border-t';
+    // 修复：将非法的换行符替换为 \n
+    const excerpt = (it.content||'').split('\n').slice(0,2).join(' / ');
+    tr.innerHTML = `<td class="py-2">${it.id}</td>
+      <td>${it.title}</td>
+      <td class="text-gray-500">${escapeHtml(excerpt)}</td>
+      <td class="space-x-2">
+        <button class="text-indigo-600" onclick="editPseudocode(${it.id}); event.stopPropagation();">编辑</button>
+        <button class="text-emerald-600" onclick="generateFlowFromPseudo(${it.id}); event.stopPropagation();">生成流程</button>
+        <button class="text-amber-600" onclick="sandboxPseudo(${it.id}); event.stopPropagation();">沙盒</button>
+        <button class="text-red-600" onclick="deletePseudocode(${it.id}); event.stopPropagation();">删除</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+  updateOverview();
+}
+
+
+function editPseudocode(id){
+  const data = pseudoCache && pseudoCache[id];
+  if(!data) return;
+  document.getElementById('pseudo_id').value = data.id;
+  document.getElementById('pseudo_title').value = data.title || '';
+  document.getElementById('pseudo_content').value = data.content || '';
+  document.getElementById('pseudo_status').innerText = '✏️ 当前编辑：' + data.title;
+}
+
+async function savePseudocode(){
+  if(!currentBotId){ alert('先选择一个 bot'); return; }
+  const id = document.getElementById('pseudo_id').value || undefined;
+  const title = document.getElementById('pseudo_title').value.trim();
+  const content = document.getElementById('pseudo_content').value.trim();
+  if(!title || !content){
+    document.getElementById('pseudo_status').innerText = '❌ 请填写标题和内容（中文伪代码）。';
+    return;
+  }
+  const payload = { title, content };
+  if(id) payload.id = Number(id);
+  const r = await fetch(`/api/bots/${currentBotId}/pseudocode`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'same-origin',
+    body: JSON.stringify(payload),
+  });
+  const j = await r.json();
+  document.getElementById('pseudo_status').innerText = j.ok ? '✅ 伪代码已保存' : ('❌ '+(j.error||'保存失败'));
+  if(j.ok){
+    resetPseudoForm();
+    loadPseudocode();
+  }
+}
+
+async function deletePseudocode(id){
+  if(!confirm('确定删除该伪代码？')) return;
+  const r = await fetch(`/api/bots/${currentBotId}/pseudocode/${id}`, { method:'DELETE', credentials:'same-origin' });
+  const j = await r.json();
+  document.getElementById('pseudo_status').innerText = j.ok ? '🗑️ 已删除伪代码' : ('❌ '+(j.error||'删除失败'));
+  loadPseudocode();
+}
+
+async function generateFlowFromPseudo(id){
+  if(!currentBotId){ alert('先选择一个 bot'); return; }
+  const targetId = id || document.getElementById('pseudo_id').value;
+  if(!targetId){
+    document.getElementById('pseudo_status').innerText = '❌ 请先选择或保存伪代码。';
+    return;
+  }
+  const r = await fetch(`/api/bots/${currentBotId}/pseudocode/${targetId}/generate_flow`, {
+    method:'POST',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({})
+  });
+  const j = await r.json();
+  if(!j.ok){
+    document.getElementById('pseudo_status').innerText = '❌ '+(j.error||'生成流程失败');
+    return;
+  }
+  document.getElementById('pseudo_status').innerText = `✅ 已生成流程「${j.name}」，命令 ${j.command}`;
+  loadFlows();
+  setActivePanel('flows');
+}
+
+async function sandboxPseudo(id){
+  if(!currentBotId){ alert('先选择一个 bot'); return; }
+  const targetId = id || document.getElementById('pseudo_id').value;
+  if(!targetId){
+    document.getElementById('pseudo_status').innerText = '❌ 请先选择或保存伪代码。';
+    return;
+  }
+  const sandboxInputEl = document.getElementById('sandbox_input');
+  const sandboxInputVal = sandboxInputEl ? sandboxInputEl.value : '';
+  const r = await fetch(`/api/bots/${currentBotId}/pseudocode/${targetId}/sandbox`, {
+    method:'POST',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ input: sandboxInputVal || '/demo' })
+  });
+  const j = await r.json();
+  const box = document.getElementById('sandbox_output');
+  if(!j.ok){
+    box.classList.remove('hidden');
+    box.textContent = '❌ '+(j.error||'沙盒运行失败');
+    return;
+  }
+  const lines = [];
+  lines.push(`命令: ${j.command}`);
+  lines.push(j.summary || '');
+  (j.actions||[]).forEach((act, idx)=>{
+    lines.push(`${idx+1}. [${act.type}] ${act.text || act.url || act.prompt || JSON.stringify(act)}`);
+  });
+  if(j.analysis){
+    lines.push('\n解析:');
+    lines.push(j.analysis);
+  }
+  box.classList.remove('hidden');
+  box.textContent = lines.join('\n');
+  setActivePanel('pseudo');
+}
+
+async function aiGeneratePseudo(){
+  const prompt = document.getElementById('pseudo_ai_prompt').value.trim();
+  const r = await fetch('/api/ai/generate', {
+    method:'POST',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ mode:'pseudocode', prompt })
+  });
+  const j = await r.json();
+  if(!j.ok){
+    document.getElementById('pseudo_status').innerText = '❌ '+(j.error||'AI 生成失败');
+    return;
+  }
+  const result = j.result || {};
+  document.getElementById('pseudo_title').value = result.title || '';
+  document.getElementById('pseudo_content').value = result.content || '';
+  const meta = j.meta || {};
+  let note = '🤖 已根据提示生成伪代码，记得保存。';
+  if(meta.api_key_configured === false){
+    note += '（当前使用内置模板，如需接入真实 AI，请在环境变量 AI_API_KEY 中配置密钥。）';
+  }
+  document.getElementById('pseudo_status').innerText = note;
+  setActivePanel('pseudo');
 }
 
 /* ---------- 监控 & 日志 ---------- */
 function fmtUptime(sec){
-  sec = Number(sec||0);
-  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
-  return `${h}h ${m}m ${s}s`;
+  return fmt.time(sec);
 }
 function badge(state){
   const map = { running:'bg-emerald-100 text-emerald-700', stopped:'bg-gray-100 text-gray-700', errored:'bg-red-100 text-red-700', starting:'bg-amber-100 text-amber-700' };
@@ -370,7 +1281,28 @@ async function refreshStatus(){
   const r3 = await fetch(`/api/bots/status_all`, { credentials:'same-origin' });
   const all = (await r3.json()).items || [];
   document.getElementById('runtime_summary').innerHTML =
-    all.map(it=>`<span class="inline-block mr-2 mb-2 px-2 py-0.5 rounded border ${it.state==='running'?'border-emerald-300':'border-gray-300'}">${it.name} ${badge(it.state)} <span class="text-xs text-gray-500">m:${it.stats?.messages||0}/e:${it.stats?.errors||0}</span></span>`).join(' ');
+  all.map(it=>{
+    const stats = it.stats || {};
+    return `<span class="inline-block mr-2 mb-2 px-2 py-0.5 rounded border ${it.state==='running'?'border-emerald-300':'border-gray-300'}">${it.name} ${badge(it.state)} <span class="text-xs text-gray-500">m:${stats.messages||0}/e:${stats.errors||0}</span></span>`;
+  }).join(' ');
+}
+
+panelTabs.forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    setActivePanel(btn.dataset.panel);
+  });
+});
+setActivePanel(activePanel);
+
+const kindSel = document.getElementById('kind');
+const mediaUrl = document.getElementById('media_url');
+if(kindSel && mediaUrl){
+  const syncMediaField = () => {
+    mediaUrl.classList.toggle('hidden', kindSel.value === 'text');
+  };
+  kindSel.addEventListener('change', syncMediaField);
+  syncMediaField();
 }
 
 me();

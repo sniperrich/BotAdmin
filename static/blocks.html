@@ -50,6 +50,22 @@ Blockly.defineBlocksWithJsonArray([
   {"type":"send_animation","message0":"发送动画/GIF URL %1 说明 %2",
    "args0":[{"type":"field_input","name":"URL","text":"https://..."},{"type":"field_input","name":"CAP","text":""}],
    "previousStatement":null, "nextStatement":null, "colour":160},
+  {"type":"send_voice","message0":"发送语音 URL %1 说明 %2",
+   "args0":[{"type":"field_input","name":"URL","text":"https://..."},{"type":"field_input","name":"CAP","text":""}],
+   "message1":"ParseMode %1",
+   "args1":[{"type":"field_dropdown","name":"PARSE","options":[["None",""],["HTML","HTML"],["MarkdownV2","MarkdownV2"]]}],
+   "previousStatement":null, "nextStatement":null, "colour":160},
+  {"type":"send_sticker","message0":"发送贴纸 file_id %1",
+   "args0":[{"type":"field_input","name":"FILE","text":"CAACAgUAAxkBAAIDlmT63..."}],
+   "previousStatement":null, "nextStatement":null, "colour":160},
+  {"type":"send_text_keyboard","message0":"发送文本+按钮 %1",
+   "args0":[{"type":"field_input","name":"TEXT","text":"请选择操作"}],
+   "message1":"按钮 JSON %1",
+   "args1":[{"type":"field_input","name":"KB","text":"[[{\"text\":\"按钮\",\"callback_data\":\"ping\"}]]"}],
+   "message2":"ParseMode %1  禁用预览 %2",
+   "args2":[{"type":"field_dropdown","name":"PARSE","options":[["None",""],["HTML","HTML"],["MarkdownV2","MarkdownV2"]]},
+            {"type":"field_checkbox","name":"NOPREVIEW","checked":false}],
+   "previousStatement":null, "nextStatement":null, "colour":160},
 
   // 变量：写入（随机/文本）、读取到临时变量、自增
   {"type":"set_var_rand","message0":"设置 作用域 %1 变量 %2 = 随机 %3 到 %4",
@@ -92,6 +108,11 @@ Blockly.defineBlocksWithJsonArray([
             {"type":"field_input","name":"PROMPT","text":"请输入…"}],
    "previousStatement":null, "nextStatement":null, "colour":290},
 
+  // 延迟执行
+  {"type":"delay_seconds","message0":"等待 %1 秒",
+   "args0":[{"type":"field_number","name":"SEC","value":3,"min":0,"max":300,"precision":0.5}],
+   "previousStatement":null, "nextStatement":null, "colour":290},
+
   // HTTP（headers/body + 保存 JSON 路径）
   {"type":"http_block","message0":"HTTP %1 %2",
    "args0":[{"type":"field_dropdown","name":"METHOD","options":[["GET","GET"],["POST","POST"]]},
@@ -118,6 +139,9 @@ const workspace = Blockly.inject('blocklyArea', {
       { "kind":"block","type":"send_photo" },
       { "kind":"block","type":"send_document" },
       { "kind":"block","type":"send_animation" },
+      { "kind":"block","type":"send_voice" },
+      { "kind":"block","type":"send_sticker" },
+      { "kind":"block","type":"send_text_keyboard" },
 
       { "kind":"label","text":"变量" },
       { "kind":"block","type":"set_var_val" },
@@ -129,6 +153,7 @@ const workspace = Blockly.inject('blocklyArea', {
       { "kind":"label","text":"逻辑" },
       { "kind":"block","type":"if_var" },
       { "kind":"block","type":"wait_next" },
+      { "kind":"block","type":"delay_seconds" },
 
       { "kind":"label","text":"网络" },
       { "kind":"block","type":"http_block" }
@@ -175,38 +200,60 @@ function rebuildFromCompiled(compiled){
     let prev = on;
 
     const applyBasicSend = (node) => {
+      let b = null;
       if(node.type==='send_text'){
-        const b = workspace.newBlock('send_text');
+        b = workspace.newBlock('send_text');
         b.setFieldValue(node.text || '', 'TEXT');
         b.setFieldValue(node.parse_mode || '', 'PARSE');
         b.setFieldValue(node.disable_preview ? 'TRUE' : 'FALSE', 'NOPREVIEW');
-        prev = chainTo(prev, b);
       } else if(node.type==='send_photo'){
-        const b = workspace.newBlock('send_photo');
+        b = workspace.newBlock('send_photo');
         b.setFieldValue(node.url || '', 'URL');
         b.setFieldValue(node.caption || '', 'CAP');
-        prev = chainTo(prev, b);
       } else if(node.type==='send_document'){
-        const b = workspace.newBlock('send_document');
+        b = workspace.newBlock('send_document');
         b.setFieldValue(node.url || '', 'URL');
         b.setFieldValue(node.caption || '', 'CAP');
-        prev = chainTo(prev, b);
       } else if(node.type==='send_animation'){
-        const b = workspace.newBlock('send_animation');
+        b = workspace.newBlock('send_animation');
         b.setFieldValue(node.url || '', 'URL');
         b.setFieldValue(node.caption || '', 'CAP');
+      } else if(node.type==='send_voice'){
+        b = workspace.newBlock('send_voice');
+        b.setFieldValue(node.url || '', 'URL');
+        b.setFieldValue(node.caption || '', 'CAP');
+        b.setFieldValue(node.parse_mode || '', 'PARSE');
+      } else if(node.type==='send_sticker'){
+        b = workspace.newBlock('send_sticker');
+        b.setFieldValue(node.file_id || node.sticker || '', 'FILE');
+      } else if(node.type==='send_text_keyboard'){
+        b = workspace.newBlock('send_text_keyboard');
+        b.setFieldValue(node.text || '', 'TEXT');
+        const kbRaw = node.keyboard || node.keyboard_json || node.buttons;
+        b.setFieldValue(typeof kbRaw === 'string' ? kbRaw : (kbRaw ? JSON.stringify(kbRaw) : ''), 'KB');
+        b.setFieldValue(node.parse_mode || '', 'PARSE');
+        b.setFieldValue(node.disable_preview ? 'TRUE' : 'FALSE', 'NOPREVIEW');
+      } else if(node.type==='delay'){
+        b = workspace.newBlock('delay_seconds');
+        b.setFieldValue(String(node.seconds || 0), 'SEC');
+      }
+      if (b) {
         prev = chainTo(prev, b);
       }
     };
 
     const nodes = entry.nodes || [];
-    for(let i=0;i<nodes.length;i++){
+    for(let i=0; i<nodes.length; i++){
       const n = nodes[i];
       switch(n.type){
         case 'send_text':
         case 'send_photo':
         case 'send_document':
         case 'send_animation':
+        case 'send_voice':
+        case 'send_sticker':
+        case 'send_text_keyboard':
+        case 'delay':
           applyBasicSend(n);
           break;
 
@@ -256,83 +303,42 @@ function rebuildFromCompiled(compiled){
         }
 
         // 旧版 if（无变量），尽力映射成 if_var（用临时变量 x）
-        case 'if': {
-          const b = workspace.newBlock('if_var');
-          b.setFieldValue('x', 'LHS');
-          b.setFieldValue(n.op || 'eq', 'OP');
-          b.setFieldValue((n.right && (n.right.text||'')) || '', 'RHS');
-
-          // then
-          let tPrev = null;
-          (n.then||[]).forEach(nn=>{
-            let nb=null;
-            if(nn.type==='send_text'){ nb=workspace.newBlock('send_text'); nb.setFieldValue(nn.text||'','TEXT'); }
-            else if(nn.type==='send_photo'){ nb=workspace.newBlock('send_photo'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
-            else if(nn.type==='send_document'){ nb=workspace.newBlock('send_document'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
-            else if(nn.type==='send_animation'){ nb=workspace.newBlock('send_animation'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
-            if(nb){
-              nb.initSvg(); nb.render();
-              if(!tPrev){ b.getInput('THEN').connection.connect(nb.previousConnection); }
-              else{ tPrev.nextConnection.connect(nb.previousConnection); }
-              tPrev = nb;
-            }
-          });
-
-          // else
-          let ePrev = null;
-          (n.else||[]).forEach(nn=>{
-            let nb=null;
-            if(nn.type==='send_text'){ nb=workspace.newBlock('send_text'); nb.setFieldValue(nn.text||'','TEXT'); }
-            else if(nn.type==='send_photo'){ nb=workspace.newBlock('send_photo'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
-            else if(nn.type==='send_document'){ nb=workspace.newBlock('send_document'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
-            else if(nn.type==='send_animation'){ nb=workspace.newBlock('send_animation'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
-            if(nb){
-              nb.initSvg(); nb.render();
-              if(!ePrev){ b.getInput('ELSE').connection.connect(nb.previousConnection); }
-              else{ ePrev.nextConnection.connect(nb.previousConnection); }
-              ePrev = nb;
-            }
-          });
-
-          prev = chainTo(prev, b);
-          break;
-        }
-
+        case 'if':
         case 'if_var': {
           const b = workspace.newBlock('if_var');
-          b.setFieldValue((n.left && n.left.var) || 'x', 'LHS');
-          b.setFieldValue(n.op || 'eq', 'OP');
-          b.setFieldValue((n.right && n.right.text) || '', 'RHS');
+          if (n.type === 'if_var') {
+             b.setFieldValue((n.left && n.left.var) || 'x', 'LHS');
+             b.setFieldValue(n.op || 'eq', 'OP');
+             b.setFieldValue((n.right && n.right.text) || '', 'RHS');
+          } else { // 'if'
+            b.setFieldValue('x', 'LHS');
+            b.setFieldValue(n.op || 'eq', 'OP');
+            b.setFieldValue((n.right && (n.right.text||'')) || '', 'RHS');
+          }
 
-          let tPrev=null;
-          (n.then||[]).forEach(nn=>{
-            let nb=null;
-            if(nn.type==='send_text'){ nb=workspace.newBlock('send_text'); nb.setFieldValue(nn.text||'','TEXT'); }
-            else if(nn.type==='send_photo'){ nb=workspace.newBlock('send_photo'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
-            else if(nn.type==='send_document'){ nb=workspace.newBlock('send_document'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
-            else if(nn.type==='send_animation'){ nb=workspace.newBlock('send_animation'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
-            if(nb){
-              nb.initSvg(); nb.render();
-              if(!tPrev){ b.getInput('THEN').connection.connect(nb.previousConnection); }
-              else{ tPrev.nextConnection.connect(nb.previousConnection); }
-              tPrev = nb;
-            }
-          });
+          const buildBranch = (branchNodes, inputName) => {
+              let branchPrev = null;
+              (branchNodes||[]).forEach(nn=>{
+                let nb=null;
+                if(nn.type==='send_text'){ nb=workspace.newBlock('send_text'); nb.setFieldValue(nn.text||'','TEXT'); }
+                else if(nn.type==='send_photo'){ nb=workspace.newBlock('send_photo'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
+                else if(nn.type==='send_document'){ nb=workspace.newBlock('send_document'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
+                else if(nn.type==='send_animation'){ nb=workspace.newBlock('send_animation'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
+                else if(nn.type==='send_voice'){ nb=workspace.newBlock('send_voice'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); nb.setFieldValue(nn.parse_mode||'','PARSE'); }
+                else if(nn.type==='send_sticker'){ nb=workspace.newBlock('send_sticker'); nb.setFieldValue(nn.file_id||nn.sticker||'','FILE'); }
+                else if(nn.type==='send_text_keyboard'){ nb=workspace.newBlock('send_text_keyboard'); nb.setFieldValue(nn.text||'','TEXT'); nb.setFieldValue(typeof nn.keyboard==='string'?nn.keyboard:(nn.keyboard?JSON.stringify(nn.keyboard): (nn.keyboard_json||'')),'KB'); nb.setFieldValue(nn.parse_mode||'','PARSE'); nb.setFieldValue(nn.disable_preview?'TRUE':'FALSE','NOPREVIEW'); }
+                else if(nn.type==='delay'){ nb=workspace.newBlock('delay_seconds'); nb.setFieldValue(String(nn.seconds||0),'SEC'); }
+                if(nb){
+                  nb.initSvg(); nb.render();
+                  if(!branchPrev){ b.getInput(inputName).connection.connect(nb.previousConnection); }
+                  else{ branchPrev.nextConnection.connect(nb.previousConnection); }
+                  branchPrev = nb;
+                }
+              });
+          };
 
-          let ePrev=null;
-          (n.else||[]).forEach(nn=>{
-            let nb=null;
-            if(nn.type==='send_text'){ nb=workspace.newBlock('send_text'); nb.setFieldValue(nn.text||'','TEXT'); }
-            else if(nn.type==='send_photo'){ nb=workspace.newBlock('send_photo'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
-            else if(nn.type==='send_document'){ nb=workspace.newBlock('send_document'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
-            else if(nn.type==='send_animation'){ nb=workspace.newBlock('send_animation'); nb.setFieldValue(nn.url||'','URL'); nb.setFieldValue(nn.caption||'','CAP'); }
-            if(nb){
-              nb.initSvg(); nb.render();
-              if(!ePrev){ b.getInput('ELSE').connection.connect(nb.previousConnection); }
-              else{ ePrev.nextConnection.connect(nb.previousConnection); }
-              ePrev = nb;
-            }
-          });
+          buildBranch(n.then, 'THEN');
+          buildBranch(n.else, 'ELSE');
 
           prev = chainTo(prev, b);
           break;
@@ -359,12 +365,16 @@ function rebuildFromCompiled(compiled){
 
         case 'wait_next': {
           const b = workspace.newBlock('wait_next');
-          b.setFieldValue(n.expect==='number'?'数字':'any', 'EXPECT');
+          // 修复：下拉菜单的值是 'any' 或 'number'，而不是中文
+          b.setFieldValue(n.expect === 'number' ? 'number' : 'any', 'EXPECT');
           b.setFieldValue(n.prompt || '', 'PROMPT');
           prev = chainTo(prev, b);
 
           // 等待后的 next 顺着主链拼上（编辑态可见性更好）
           (n.next||[]).forEach(nn => applyBasicSend(nn));
+
+          // 关键修复：在这里跳出主循环，因为后续节点都属于 next 的范畴
+          i = nodes.length; // 设置 i 到末尾来终止循环
           break;
         }
 
@@ -378,7 +388,9 @@ function rebuildFromCompiled(compiled){
 
   try{
     const hint = document.getElementById('hint');
-    if(hint) hint.innerHTML += ' ｜ 本次从 <code>entries</code> 近似还原，保存一次后将精确还原。';
+    if(hint && !hint.innerText.includes('近似还原')) {
+        hint.innerHTML += ' ｜ 本次从 <code>entries</code> 近似还原，保存一次后将精确还原。';
+    }
   }catch(e){}
 }
 
@@ -390,110 +402,82 @@ function toFlowJSON() {
     if(b.type!=='on_command') return;
     const cmd = b.getFieldValue('CMD') || ('cmd'+(bi+1));
     const nodes = [];
-    let cur = b.getNextBlock();
+    let cur = b; // 从入口块开始
 
-    const push = (n)=>nodes.push(n);
+    // Helper to process a chain of blocks
+    const processChain = (startBlock) => {
+        let chainNodes = [];
+        let current = startBlock;
+        while(current){
+            switch(current.type){
+                case 'send_text':
+                  chainNodes.push({type:'send_text', text: current.getFieldValue('TEXT'), parse_mode: current.getFieldValue('PARSE') || '', disable_preview: (current.getFieldValue('NOPREVIEW') === 'TRUE')});
+                  break;
+                case 'send_photo':
+                  chainNodes.push({type:'send_photo', url: current.getFieldValue('URL'), caption: current.getFieldValue('CAP')});
+                  break;
+                case 'send_document':
+                  chainNodes.push({type:'send_document', url: current.getFieldValue('URL'), caption: current.getFieldValue('CAP')});
+                  break;
+                case 'send_animation':
+                  chainNodes.push({type:'send_animation', url: current.getFieldValue('URL'), caption: current.getFieldValue('CAP')});
+                  break;
+                case 'send_voice':
+                  chainNodes.push({type:'send_voice', url: current.getFieldValue('URL'), caption: current.getFieldValue('CAP'), parse_mode: current.getFieldValue('PARSE') || ''});
+                  break;
+                case 'send_sticker':
+                  chainNodes.push({type:'send_sticker', file_id: current.getFieldValue('FILE')});
+                  break;
+                case 'send_text_keyboard':
+                  chainNodes.push({type:'send_text_keyboard', text: current.getFieldValue('TEXT'), keyboard: current.getFieldValue('KB'), parse_mode: current.getFieldValue('PARSE') || '', disable_preview: (current.getFieldValue('NOPREVIEW') === 'TRUE')});
+                  break;
+                case 'set_var_rand':
+                  chainNodes.push({type:'set_var', mode:'random', scope: current.getFieldValue('SCOPE'), key: current.getFieldValue('KEY'), random:{min:Number(current.getFieldValue('MIN')), max:Number(current.getFieldValue('MAX'))}});
+                  break;
+                case 'set_var_val':
+                  chainNodes.push({type:'set_var', mode:'text', scope: current.getFieldValue('SCOPE'), key: current.getFieldValue('KEY'), value: current.getFieldValue('VAL')});
+                  break;
+                case 'inc_var':
+                  chainNodes.push({type:'inc_var', scope: current.getFieldValue('SCOPE'), key: current.getFieldValue('KEY'), step: Number(current.getFieldValue('STEP')||1)});
+                  break;
+                case 'get_var':
+                  chainNodes.push({type:'get_var', scope: current.getFieldValue('SCOPE'), key: current.getFieldValue('KEY'), alias: current.getFieldValue('ALIAS')});
+                  break;
+                case 'set_local_from_input':
+                  chainNodes.push({type:'set_local_from_input', alias: current.getFieldValue('ALIAS')});
+                  break;
+                case 'if_var':
+                  const thenBranch = processChain(current.getInputTargetBlock('THEN'));
+                  const elseBranch = processChain(current.getInputTargetBlock('ELSE'));
+                  chainNodes.push({type:'if_var', op: current.getFieldValue('OP'), left:{var:current.getFieldValue('LHS')}, right:{text:current.getFieldValue('RHS')}, then: thenBranch, else: elseBranch});
+                  break;
+                case 'wait_next':
+                  // This is a terminal block for this chain
+                  const nextBranch = processChain(current.getNextBlock());
+                  chainNodes.push({type:'wait_next', expect: (current.getFieldValue('EXPECT')==='number'?'number':'any'), prompt: current.getFieldValue('PROMPT'), next: nextBranch});
+                  return chainNodes; // End the chain here
+                case 'http_block':
+                  chainNodes.push({type:'http', method:current.getFieldValue('METHOD'), url:current.getFieldValue('URL'), headers:current.getFieldValue('HEAD'), body:current.getFieldValue('BODY'), save_to:{scope:current.getFieldValue('SCOPE'), key:current.getFieldValue('KEY')}, json_path:current.getFieldValue('JPATH')});
+                  break;
+                case 'delay_seconds':
+                  chainNodes.push({type:'delay', seconds: Number(current.getFieldValue('SEC')||0)});
+                  break;
+            }
+            current = current.getNextBlock();
+        }
+        return chainNodes;
+    };
 
-    while(cur){
-      switch(cur.type){
-        case 'send_text':
-          push({
-            type:'send_text',
-            text: cur.getFieldValue('TEXT'),
-            parse_mode: cur.getFieldValue('PARSE') || '',
-            disable_preview: (cur.getFieldValue('NOPREVIEW') === 'TRUE')
-          }); break;
-        case 'send_photo':
-          push({type:'send_photo', url: cur.getFieldValue('URL'), caption: cur.getFieldValue('CAP')}); break;
-        case 'send_document':
-          push({type:'send_document', url: cur.getFieldValue('URL'), caption: cur.getFieldValue('CAP')}); break;
-        case 'send_animation':
-          push({type:'send_animation', url: cur.getFieldValue('URL'), caption: cur.getFieldValue('CAP')}); break;
-        case 'set_var_rand':
-          push({type:'set_var', mode:'random',
-                scope: cur.getFieldValue('SCOPE'), key: cur.getFieldValue('KEY'),
-                random:{min:Number(cur.getFieldValue('MIN')), max:Number(cur.getFieldValue('MAX'))}});
-          break;
-        case 'set_var_val':
-          push({type:'set_var', mode:'text',
-                scope: cur.getFieldValue('SCOPE'), key: cur.getFieldValue('KEY'),
-                value: cur.getFieldValue('VAL')});
-          break;
-        case 'inc_var':
-          push({type:'inc_var',
-                scope: cur.getFieldValue('SCOPE'), key: cur.getFieldValue('KEY'),
-                step: Number(cur.getFieldValue('STEP')||1)});
-          break;
-        case 'get_var':
-          push({type:'get_var',
-                scope: cur.getFieldValue('SCOPE'), key: cur.getFieldValue('KEY'),
-                alias: cur.getFieldValue('ALIAS')});
-          break;
-        case 'set_local_from_input':
-          push({type:'set_local_from_input', alias: cur.getFieldValue('ALIAS')});
-          break;
-        case 'if_var': {
-          const thenNodes=[]; let t=cur.getInputTargetBlock('THEN');
-          while(t){
-            if(t.type==='send_text') thenNodes.push({type:'send_text',text:t.getFieldValue('TEXT'),parse_mode:'',disable_preview:false});
-            else if(t.type==='send_photo') thenNodes.push({type:'send_photo',url:t.getFieldValue('URL'),caption:t.getFieldValue('CAP')});
-            else if(t.type==='send_document') thenNodes.push({type:'send_document',url:t.getFieldValue('URL'),caption:t.getFieldValue('CAP')});
-            else if(t.type==='send_animation') thenNodes.push({type:'send_animation',url:t.getFieldValue('URL'),caption:t.getFieldValue('CAP')});
-            t=t.getNextBlock();
-          }
-          const elseNodes=[]; let e=cur.getInputTargetBlock('ELSE');
-          while(e){
-            if(e.type==='send_text') elseNodes.push({type:'send_text',text:e.getFieldValue('TEXT'),parse_mode:'',disable_preview:false});
-            else if(e.type==='send_photo') elseNodes.push({type:'send_photo',url:e.getFieldValue('URL'),caption:e.getFieldValue('CAP')});
-            else if(e.type==='send_document') elseNodes.push({type:'send_document',url:e.getFieldValue('URL'),caption:e.getFieldValue('CAP')});
-            else if(e.type==='send_animation') elseNodes.push({type:'send_animation',url:e.getFieldValue('URL'),caption:e.getFieldValue('CAP')});
-            e=e.getNextBlock();
-          }
-          push({type:'if_var',
-                op: cur.getFieldValue('OP'),
-                left:{var:cur.getFieldValue('LHS')},
-                right:{text:cur.getFieldValue('RHS')},
-                then: thenNodes, else: elseNodes});
-          break;
-        }
-        case 'wait_next': {
-          const nextNodes = [];
-          let nxt = cur.getNextBlock();
-          while(nxt){
-            if(nxt.type==='send_text') nextNodes.push({type:'send_text', text:nxt.getFieldValue('TEXT'),parse_mode:'',disable_preview:false});
-            else if(nxt.type==='send_photo') nextNodes.push({type:'send_photo', url:nxt.getFieldValue('URL'), caption:nxt.getFieldValue('CAP')});
-            else if(nxt.type==='send_document') nextNodes.push({type:'send_document', url:nxt.getFieldValue('URL'), caption:nxt.getFieldValue('CAP')});
-            else if(nxt.type==='send_animation') nextNodes.push({type:'send_animation', url:nxt.getFieldValue('URL'), caption:nxt.getFieldValue('CAP')});
-            else if(nxt.type==='http_block') nextNodes.push({type:'http',
-                method:nxt.getFieldValue('METHOD'), url:nxt.getFieldValue('URL'),
-                headers:nxt.getFieldValue('HEAD'), body:nxt.getFieldValue('BODY'),
-                save_to:{scope:nxt.getFieldValue('SCOPE'), key:nxt.getFieldValue('KEY')},
-                json_path:nxt.getFieldValue('JPATH')});
-            nxt = nxt.getNextBlock();
-          }
-          push({type:'wait_next',
-                expect: (cur.getFieldValue('EXPECT')==='数字'?'number':'any'),
-                prompt: cur.getFieldValue('PROMPT'),
-                next: nextNodes});
-          break;
-        }
-        case 'http_block':
-          push({type:'http',
-                method:cur.getFieldValue('METHOD'), url:cur.getFieldValue('URL'),
-                headers:cur.getFieldValue('HEAD'), body:cur.getFieldValue('BODY'),
-                save_to:{scope:cur.getFieldValue('SCOPE'), key:cur.getFieldValue('KEY')},
-                json_path:cur.getFieldValue('JPATH')});
-          break;
-      }
-      cur = cur.getNextBlock();
-    }
-    entries.push({id:`e${entries.length+1}`, type:'on_command', command:`/${cmd}`, nodes});
+    const nodes_list = processChain(b.getNextBlock());
+
+    entries.push({id:`e${entries.length+1}`, type:'on_command', command:`/${cmd}`, nodes: nodes_list});
   });
 
-  // 附带 XML 便于回填
-  const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace));
-  return {version:1, entries, __xml: xml};
+  // 关键修复：使用新的JSON序列化API来保存工作区状态
+  const workspaceState = Blockly.serialization.workspaces.save(workspace);
+  return {version:1, entries, __workspaceState: workspaceState};
 }
+
 
 // ---------------- 保存 & 发布 ----------------
 async function saveFlow(){
@@ -509,7 +493,7 @@ async function saveFlow(){
     body: JSON.stringify({ id: flowId ? Number(flowId) : undefined, name, blocks_json: JSON.stringify(compiled) })
   });
   const j = await r.json();
-  if(!j.ok){ alert('保存失败'); return; }
+  if(!j.ok){ alert('保存失败: ' + (j.error || '未知错误')); return; }
 
   await fetch(`/api/bots/${botId}/start`, { method:'POST', credentials:'same-origin' });
   alert('已保存并发布');
@@ -519,17 +503,11 @@ async function saveFlow(){
 }
 
 // ---------------- 打开时回填 ----------------
-function loadXML(xmlText){
-  try{
-    const dom = Blockly.Xml.textToDom(xmlText);
-    workspace.clear();
-    Blockly.Xml.domToWorkspace(dom, workspace);
-  }catch(e){ console.error('加载 XML 失败', e); }
-}
-
 async function loadFlowForEdit(){
-  if(!botId) return;
-
+  if(!botId) {
+     const on = workspace.newBlock('on_command'); on.initSvg(); on.render(); on.moveBy(20,20);
+     return;
+  }
   if(!flowId){
     const on = workspace.newBlock('on_command'); on.initSvg(); on.render(); on.moveBy(20,20);
     return;
@@ -538,19 +516,31 @@ async function loadFlowForEdit(){
   const r = await fetch(`/api/bots/${botId}/flows`, { credentials:'same-origin' });
   const j = await r.json();
   const item = (j.items||[]).find(x=>String(x.id)===String(flowId));
-  if(!item){ console.warn('找不到 flow 记录'); return; }
-
-  const compiled = safeParseBlocksJson(item.blocks_json);
-
-  if(compiled && compiled.__xml){
-    try{ loadXML(compiled.__xml); return; }
-    catch(e){ console.warn('XML 还原失败，退回 entries：', e); }
+  if(!item){
+     console.warn('找不到 flow 记录');
+     const on = workspace.newBlock('on_command'); on.initSvg(); on.render(); on.moveBy(20,20);
+     return;
   }
 
+  let compiled = item.blocks_compiled || safeParseBlocksJson(item.blocks_json);
+
+  // 关键修复：优先使用新的 __workspaceState (JSON) 来加载
+  if(compiled && compiled.__workspaceState){
+    try{
+      Blockly.serialization.workspaces.load(compiled.__workspaceState, workspace);
+      return;
+    } catch(e){
+      console.warn('JSON工作区状态还原失败，退回 entries 近似还原：', e);
+    }
+  }
+
+  // 后备方案：如果只有旧的 entries 数据，则尝试近似重建
   if(compiled && compiled.entries){
-    rebuildFromCompiled(compiled); return;
+    rebuildFromCompiled(compiled);
+    return;
   }
 
+  // 如果完全没有可用的数据，创建一个默认的入口块
   const on = workspace.newBlock('on_command'); on.initSvg(); on.render(); on.moveBy(20,20);
 }
 

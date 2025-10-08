@@ -64,10 +64,24 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             bot_id INTEGER NOT NULL,
             name TEXT NOT NULL,
-            blocks_json TEXT NOT NULL,   -- compiled flow + __xml
+            blocks_json TEXT NOT NULL,   -- compiled flow + __workspaceState
             active INTEGER DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(bot_id) REFERENCES bots(id) ON DELETE CASCADE
+        );
+
+        -- 新增：专业模式 Python 脚本表
+        CREATE TABLE IF NOT EXISTS pro_scripts(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bot_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            command TEXT NOT NULL, -- 触发命令，带 /
+            code TEXT NOT NULL,
+            active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(bot_id, command),
             FOREIGN KEY(bot_id) REFERENCES bots(id) ON DELETE CASCADE
         );
 
@@ -82,22 +96,35 @@ def init_db():
             UNIQUE(bot_id, scope, chat_id, user_id, key),
             FOREIGN KEY(bot_id) REFERENCES bots(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS pseudocode(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bot_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(bot_id) REFERENCES bots(id) ON DELETE CASCADE
+        );
         """)
     return True
 
 
 # ---------------- users ----------------
-def _hash(pw: str) -> str:
+def hash_password(pw: str) -> str:
+    """Hashes a password using SHA256."""
     return hashlib.sha256(pw.encode("utf-8")).hexdigest()
 
 def create_user(username: str, password: str) -> (bool, Optional[str]):
+    username = (username or "").strip()
+    password = (password or "").strip()
     if not username or not password:
         return False, "用户名/密码不能为空"
     with get_conn() as con:
         try:
             con.execute(
                 "INSERT INTO users(username, password_hash) VALUES (?,?)",
-                (username, _hash(password)),
+                (username, hash_password(password)),
             )
             return True, None
         except sqlite3.IntegrityError:
@@ -175,7 +202,6 @@ def upsert_command(
 ) -> (bool, Optional[str]):
     if not command:
         return False, "command 不能为空"
-    # 统一命令前缀
     if not command.startswith("/"):
         command = "/" + command
     with get_conn() as con:
@@ -247,6 +273,110 @@ def delete_flow(bot_id: int, flow_id: int) -> (bool, Optional[str]):
         if cur.rowcount == 0:
             return False, "未找到该流程"
     return True, None
+
+# ---------------- pro_scripts (新增) ----------------
+def list_pro_scripts(bot_id: int) -> List[Dict]:
+    with get_conn() as con:
+        cur = con.execute(
+            "SELECT id, name, command, code, active, created_at, updated_at "
+            "FROM pro_scripts WHERE bot_id=? ORDER BY command",
+            (bot_id,),
+        )
+        return cur.fetchall() or []
+
+def upsert_pro_script(
+    bot_id: int,
+    name: str,
+    command: str,
+    code: str,
+    script_id: Optional[int] = None,
+    active: int = 1,
+) -> (bool, Optional[str], Optional[int]):
+    name = (name or "").strip()
+    command = (command or "").strip()
+    code = (code or "").strip()
+    if not all([name, command, code]):
+        return False, "名称、命令和代码都不能为空", None
+    if not command.startswith("/"):
+        command = "/" + command
+
+    with get_conn() as con:
+        try:
+            if script_id:
+                cur = con.execute(
+                    "UPDATE pro_scripts SET name=?, command=?, code=?, active=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND bot_id=?",
+                    (name, command, code, int(bool(active)), script_id, bot_id),
+                )
+                if cur.rowcount == 0:
+                    return False, "未找到该脚本或无权限", script_id
+                return True, None, script_id
+            else:
+                cur = con.execute(
+                    "INSERT INTO pro_scripts(bot_id, name, command, code, active) VALUES(?,?,?,?,?)",
+                    (bot_id, name, command, code, int(bool(active))),
+                )
+                return True, None, cur.lastrowid
+        except sqlite3.IntegrityError:
+            return False, f"命令 '{command}' 已存在，请使用其他命令", None
+
+def delete_pro_script(bot_id: int, script_id: int) -> (bool, Optional[str]):
+    with get_conn() as con:
+        cur = con.execute("DELETE FROM pro_scripts WHERE id=? AND bot_id=?", (script_id, bot_id))
+        if cur.rowcount == 0:
+            return False, "未找到该脚本"
+    return True, None
+
+
+# ---------------- pseudocode ----------------
+def list_pseudocode(bot_id: int) -> List[Dict]:
+    with get_conn() as con:
+        cur = con.execute(
+            "SELECT id, title, content, created_at, updated_at FROM pseudocode "
+            "WHERE bot_id=? ORDER BY id DESC",
+            (bot_id,),
+        )
+        return cur.fetchall() or []
+
+
+def upsert_pseudocode(bot_id: int, title: str, content: str, pseudo_id: Optional[int] = None) -> (bool, Optional[str], Optional[int]):
+    title = (title or "").strip()
+    content = (content or "").strip()
+    if not title or not content:
+        return False, "标题/内容不能为空", None
+    with get_conn() as con:
+        if pseudo_id:
+            cur = con.execute(
+                "UPDATE pseudocode SET title=?, content=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND bot_id=?",
+                (title, content, pseudo_id, bot_id),
+            )
+            if cur.rowcount == 0:
+                return False, "未找到该伪代码", None
+            return True, None, pseudo_id
+        cur = con.execute(
+            "INSERT INTO pseudocode(bot_id, title, content) VALUES (?,?,?)",
+            (bot_id, title, content),
+        )
+        return True, None, cur.lastrowid
+
+
+def delete_pseudocode(bot_id: int, pseudo_id: int) -> (bool, Optional[str]):
+    with get_conn() as con:
+        cur = con.execute(
+            "DELETE FROM pseudocode WHERE id=? AND bot_id=?",
+            (pseudo_id, bot_id),
+        )
+        if cur.rowcount == 0:
+            return False, "未找到该伪代码"
+    return True, None
+
+
+def get_pseudocode(bot_id: int, pseudo_id: int) -> Optional[Dict]:
+    with get_conn() as con:
+        cur = con.execute(
+            "SELECT id, title, content, created_at, updated_at FROM pseudocode WHERE id=? AND bot_id=?",
+            (pseudo_id, bot_id),
+        )
+        return cur.fetchone()
 
 
 # ---------------- kv_store for flows ----------------
