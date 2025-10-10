@@ -1,242 +1,218 @@
-# 🤖 Bot Admin - 可视化 Telegram 机器人管理后台
+# 🤖 Bot Admin – Telegram 机器人可视化控制台 · Visual Management Console
 
-[![Language](https://img.shields.io/badge/Language-Python-blue.svg)](https://www.python.org/)
-[![Framework](https://img.shields.io/badge/Framework-Flask-black.svg)](https://flask.palletsprojects.com/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Star me on GitHub](https://img.shields.io/github/stars/sniperrich/BotAdmin?style=social)](https://github.com/sniperrich/BotAdmin)
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="python" />
+  <img src="https://img.shields.io/badge/Flask-3.x-black.svg" alt="flask" />
+  <img src="https://img.shields.io/badge/Realtime-Socket.IO-ff9800.svg" alt="socketio" />
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="license" />
+</p>
 
-[**English**](#-bot-admin---a-visual-management-panel-for-telegram-bots) | [**简体中文**](#-bot-admin---可视化-telegram-机器人管理后台)
-
-Bot Admin 是一个功能强大、对用户友好的 Web 管理面板，专为 Telegram 机器人设计。它让用户能够通过一个直观的网页界面，轻松地创建、管理和部署多个机器人，而无需深入复杂的后端代码。
-
-本项目的核心理念是提供一个从 **零代码** 到 **专业代码** 的全链路解决方案，无论您是产品经理、运营人员还是专业开发者，都能找到最高效的工作流。
-
-![Bot Admin Dashboard](https://raw.githubusercontent.com/sniperrich/BotAdmin/main/screenshot.png)
+<p align="center">
+  <a href="#-中文版">简体中文</a> · <a href="#-english">English</a>
+</p>
 
 ---
 
-## ✨ 核心功能
+## 🇨🇳 中文版 {#中文版}
 
-*   **👤 多用户 & 认证**: 支持多用户注册和登录，每个用户的数据都安全隔离，只能管理自己创建的机器人。
-*   **🧩 多机器人管理**:
-    *   在一个界面中添加、配置和删除多个 Telegram Bot。
-    *   一键启动、停止、重载机器人后台进程。
-    *   实时监控机器人运行状态、在线时长、消息统计和最新日志。
-*   **🎨 多维度指令定义方式**:
-    *   **固定指令**: 快速创建简单的“命令-回复”式交互，支持文本、图片、文档等多种消息类型，适合新手快速上手。
-    *   **流程编排 (Blockly)**: 通过拖拽积木块来设计复杂的多步骤对话流、API交互和条件逻辑，实现零代码构建强大功能。
-    *   **专业模式 (Python)**: 为高级用户提供一个安全的沙箱环境，可以直接编写 Python 代码来处理机器人逻辑，拥有最高的自由度和灵活性。
-    *   **中文伪代码**: 使用自然语言描述机器人行为，一键将其转换为可视化的 Blockly 流程图，极大降低了复杂流程的设计门槛。
-*   **🚀 AI 辅助创作**:
-    *   可选集成 DeepSeek AI（或其他兼容 OpenAI 的模型），只需一句话描述需求，即可自动生成指令模板和中文伪代码。
-    *   在未配置 API Key 的情况下，提供智能离线模板作为备用，不影响核心功能。
-*   **📊 实时监控**:
-    *   仪表盘实时展示所有机器人的运行状态、在线时长、消息和错误计数。
-    *   独立的监控面板，可查看选中机器人的详细状态和实时日志流。
+### 🌟 项目简介
+Bot Admin 是一款为 Telegram 机器人量身打造的 Web 管理后台，让你无需编写繁琐脚本，即可完成 **创建 / 配置 / 部署 / 运营 / 监控** 的全流程。全新的实时架构和模块化目录结构，让多人协作、团队托管、自动化扩展都变得轻而易举。
 
-## 🚀 快速开始
+> **零代码 & 专业级并行**：支持固定命令、可视化流程（Blockly）、专业 Python 沙盒、中文伪代码和 AI 自动生成——同一个平台满足从运营到工程的不同角色。
 
-### 1. 环境准备
+### ✨ 功能亮点
+| 功能 | 说明 |
+| --- | --- |
+| 多用户与多机器人 | 支持注册登录，Bot 数据隔离管理，可同时维护多个 Telegram Bot。
+| 实时状态看板 | 前端通过 Socket.IO 收取推送，机器人卡片、运行监控、统计面板秒级更新。
+| 指令管理矩阵 | 固定指令 / Blockly 流程 / 专业 Python 脚本 / 中文伪代码互相补充，满足不同复杂度需求。
+| AI 智能辅助 | 可接入 DeepSeek（或任意 OpenAI 兼容接口）自动生成命令模板、伪代码；离线模式下提供兜底模板。
+| 沙盒调试与日志 | 提供伪代码沙盒执行、实时日志流、错误高亮，方便定位问题。
+| 结构化目录 | `config/`、`core/`、`data/`、`interact/` 等分层，便于快速理解、二次开发与测试。
 
-*   Python 3.8 或更高版本。
-*   Git
-
-### 2. 克隆与安装
-
-```bash
-# 克隆仓库
-git clone https://github.com/sniperrich/BotAdmin.git
-cd BotAdmin
-
-# 推荐在虚拟环境中操作
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 安装依赖
-pip install -r requirements.txt
+### 🧱 目录结构
+```text
+BotAdmin/
+├─ config/            # 全局配置（路径、密钥、静态目录）
+├─ data/              # 数据访问层（SQLite 读写、DAO 方法）
+├─ core/              # 业务核心（AI、伪代码、流程引擎、运行时）
+├─ interact/          # Web 接口层（Flask + Socket.IO 蓝图）
+├─ static/            # 前端单页应用（Tailwind + Socket.IO 客户端）
+├─ requirements.txt   # 依赖清单
+├─ main.py            # 开发入口（socketio.run）
+└─ README.md
 ```
 
-### 3. 配置环境变量
+### ⚙️ 运行前准备
+1. **环境需求**：Python 3.10+，SQLite（内置），Node 无需安装。
+2. **安装依赖**：
+   ```bash
+   git clone https://github.com/sniperrich/BotAdmin.git
+   cd BotAdmin
+   python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+3. **环境变量（可选）**：
+   ```bash
+   export APP_SECRET="your_random_secret"        # Session 加密
+   export DEEPSEEK_API_KEY="sk-xxxx"            # 可选，启用 AI 自动生成
+   export DEEPSEEK_BASE_URL="https://api.deepseek.com"  # 可选，兼容其他 OpenAI 接口
+   ```
+4. **启动服务**：
+   ```bash
+   python main.py
+   ```
+   默认监听 `http://127.0.0.1:8000`，浏览器访问即可。
 
-在项目根目录下创建一个名为 `.env` 的文件，并填入以下内容。
+### 🚀 快速上手
+1. **注册登录**：首次访问创建账户后登录。
+2. **创建 Bot**：在 Telegram `@BotFather` 获取 Token，填写于“我的 Bots”面板，一键添加。
+3. **配置行为**：在控制中心依次切换“固定指令 / 流程编排 / 中文伪代码 / 专业模式”标签进行配置。
+4. **启动调试**：点击“启动/重载”让新配置生效，实时监控面板与日志将立即刷新。
+5. **AI 协作**：在对应面板填写提示词，调用 DeepSeek（若已配置密钥）快速生成命令或伪代码。
 
-```env
-# [必填] Flask 应用的加密密钥，用于保护 session。请替换为一串随机字符。
-# 可以使用 python -c 'import secrets; print(secrets.token_hex(16))' 生成
-APP_SECRET="your_strong_random_secret_string"
+### 🛠 常用命令
+| 场景 | 命令 |
+| --- | --- |
+| 安装依赖 | `pip install -r requirements.txt` |
+| 代码静态检查 | `python -m py_compile $(git ls-files '*.py')` |
+| 启动后端 | `python main.py` |
+| 导出数据库 | `sqlite3 bot_admin.db .dump > backup.sql` |
 
-# [可选] AI 功能配置
-# 如果您想使用 AI 辅助生成功能，请提供您的 DeepSeek API Key
-# 也可使用任何兼容 OpenAI 接口的 Key
-DEEPSEEK_API_KEY="your_deepseek_api_key"
+### 🔒 配置说明
+| 变量 | 说明 |
+| --- | --- |
+| `APP_SECRET` | Flask Session 密钥（强烈建议自定义）。 |
+| `BOT_ADMIN_DB` | 可自定义数据库路径，默认项目根目录下 `bot_admin.db`。 |
+| `DEEPSEEK_API_KEY` / `AI_API_KEY` | 启用 AI 自动生成功能时需要。 |
+| `DEEPSEEK_BASE_URL` / `AI_BASE_URL` | 若使用第三方 OpenAI 兼容服务可指定。 |
 
-# [可选] 如果您使用第三方兼容 OpenAI 的服务，请指定其 Base URL
-# DEEPSEEK_BASE_URL="https://api.deepseek.com"
-```
+### 🧭 技术架构
+- **后端**：Flask + Flask-SocketIO，REST API + WebSocket 实时推送。
+- **业务层**：`core.runtime.BotRegistry` 提供多线程异步调度，支持自动重启/命令同步。
+- **数据层**：`data.database` 中实现了所有 SQLite CRUD 方法，便于单元化测试。
+- **AI 适配**：`core.ai` 统一封装 DeepSeek/OpenAI 客户端，自动降级到本地模板。
+- **前端**：原生单页 + TailwindCSS，自带命令卡片、流程预览、伪代码沙盒、日志面板。
 
-### 4. 初始化与运行
+### 🧪 测试建议
+- 针对 `core/` 和 `data/` 模块可使用 `pytest` 配合临时数据库进行单元测试。
+- 使用 `python -m py_compile` 保证语法完整；前端可通过浏览器 DevTools 观察 WebSocket 数据。
 
-项目首次运行时会自动创建 `bot_admin.db` 数据库文件。
+### 📅 开发路线
+- [ ] 支持 Docker 一键部署方案。
+- [ ] Flow 编辑器增加导入导出与协作模板。
+- [ ] Pro Script 沙盒提供更详细的资源配额与 API 白名单。
+- [ ] 接入更多 AI 模型（如 gpt-4o / 文心等）。
 
-```bash
-python app.py
-```
+### 🤝 贡献指南
+1. Fork 仓库并创建分支：`git checkout -b feature/awesome`
+2. 提交更改：`git commit -m "Add awesome feature"`
+3. 推送并发起 Pull Request。
 
-服务将启动在 `http://127.0.0.1:8000`。现在，您可以在浏览器中访问它。
-
-## 📖 使用指南
-
-1.  **注册与登录**: 首次使用请先注册一个管理员账户，然后登录。
-2.  **添加机器人**:
-    *   从 Telegram 的官方 `@BotFather` 获取您的机器人 `Token`。
-    *   在“我的 Bots”板块，填入机器人名称和 Token，点击“添加”。
-3.  **选择与配置**:
-    *   点击新创建的机器人卡片，下方将展开“Bot 控制中心”。
-    *   在 **固定指令**、**流程编排**、**专业模式** 或 **中文伪代码** 标签页中定义机器人的行为。
-4.  **启动机器人**: 在卡片上或控制中心点击 **“启动/重载”** 按钮。
-5.  **测试**: 前往 Telegram，与您的机器人对话，测试您配置的各项功能。
-
-> **⚠️ 重要提示**: 每当您修改了任何指令、流程或脚本后，都需要点击 **“启动/重载”** 按钮来应用更改，使之在运行中的机器人上生效。
-
-## 🔮 未来路线图
-
-*   [ ] **实时化改造 (WebSocket)**: 使用 WebSocket 替代前端轮询，实现真正的实时日志和状态更新。
-*   [ ] **计划任务 (Job Queue)**: 在“专业模式”中增加定时触发器，实现每日推送、定时提醒等功能。
-*   [ ] **高级代码编辑器**: 为“专业模式”引入 Monaco Editor 或 CodeMirror，提供语法高亮和代码补全。
-*   [ ] **一键部署**: 提供 `Dockerfile` 和 `docker-compose.yml`，简化部署流程。
-
-## ❤️ 贡献
-
-欢迎任何形式的贡献！如果您有好的想法或发现了 Bug，请随时提交 Pull Request 或创建 Issue。
-
-1.  Fork 本仓库
-2.  创建您的特性分支 (`git checkout -b feature/AmazingFeature`)
-3.  提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
-4.  推送到分支 (`git push origin feature/AmazingFeature`)
-5.  创建一个 Pull Request
-
-## 📄 许可证
-
-本项目基于 MIT 许可证。详情请见 `LICENSE` 文件。
-
----
-<br>
-
-# 🤖 Bot Admin - A Visual Management Panel for Telegram Bots
-
-[![Language](https://img.shields.io/badge/Language-Python-blue.svg)](https://www.python.org/)
-[![Framework](https://img.shields.io/badge/Framework-Flask-black.svg)](https://flask.palletsprojects.com/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Star me on GitHub](https://img.shields.io/github/stars/sniperrich/BotAdmin?style=social)](https://github.com/sniperrich/BotAdmin)
-
-Bot Admin is a powerful, user-friendly web-based panel designed for Telegram bots. It allows users to effortlessly create, manage, and deploy multiple bots through an intuitive web interface, without needing to dive into complex backend code.
-
-The core philosophy of this project is to provide a **full-spectrum solution from zero-code to pro-code**, ensuring that product managers, operations staff, and professional developers alike can find their most efficient workflow.
-
-![Bot Admin Dashboard](https://raw.githubusercontent.com/sniperrich/BotAdmin/main/screenshot.png)
+### 📄 开源协议
+项目基于 [MIT License](LICENSE)。欢迎自由使用、修改与分发。
 
 ---
 
-## ✨ Core Features
+## 🇺🇸 English {#english}
 
-*   **👤 Multi-User & Authentication**: Supports user registration and login, with each user's data securely isolated to manage their own bots.
-*   **🧩 Multi-Bot Management**:
-    *   Add, configure, and delete multiple Telegram bots from a single interface.
-    *   One-click start, stop, and reload bot processes.
-    *   Real-time monitoring of bot status, uptime, and message statistics.
-*   **🎨 Versatile Logic Definition**:
-    *   **Fixed Commands**: Quickly create simple command-response interactions with support for text, photos, documents, and more. Perfect for beginners.
-    *   **Flow Orchestration (Blockly)**: Design complex, multi-step conversational flows, API interactions, and conditional logic by dragging and dropping blocks. Build powerful features with zero code.
-    *   **Pro Mode (Python)**: Provides a secure sandbox environment for advanced users to write Python code directly, offering maximum freedom and flexibility.
-    *   **Pseudocode (Chinese)**: Describe bot behavior in natural language (Chinese), and with one click, convert it into a visual Blockly flow, significantly lowering the barrier to designing complex logic.
-*   **🚀 AI-Powered Generation**:
-    *   Optional integration with DeepSeek AI (or any OpenAI-compatible model). Simply describe your needs in a sentence to automatically generate command templates and pseudocode.
-    *   Provides intelligent offline templates as a fallback if no API key is configured, ensuring core functionality is always available.
-*   **📊 Real-time Monitoring**:
-    *   A dashboard that displays the real-time status, uptime, and message/error counts for all bots.
-    *   A dedicated monitoring panel to view detailed status and a live log stream for the selected bot.
+### 🌟 Overview
+Bot Admin is a web-based control center tailored for Telegram bots. It offers a full workflow—from bootstrapping a new bot, configuring commands, orchestrating complex flows, to monitoring production traffic. The latest version ships with a real-time Socket.IO layer and a clean, layered directory structure to support teamwork and large-scale automation.
 
-## 🚀 Getting Started
+> **Zero-code meets Pro-code**: fixed commands, visual flows (Blockly), Pro Python sandbox, Chinese pseudocode, and AI co-pilot are all available in the same workspace.
 
-### 1. Prerequisites
+### ✨ Highlights
+| Feature | Description |
+| --- | --- |
+| Multi-user & Multi-bot | User accounts with isolated data scopes; manage any number of Telegram bots side-by-side. |
+| Realtime dashboard | Frontend consumes Socket.IO events—bot cards, runtime panels, and stats update instantly. |
+| Rich authoring modes | Fixed command replies, Blockly flow orchestration, Python sandbox scripts, and Chinese pseudocode complement each other. |
+| AI assistance | Plug in DeepSeek (or any OpenAI-compatible endpoint) to generate command templates or pseudocode in seconds; offline fallbacks included. |
+| Sandbox & logs | Built-in pseudocode sandbox, live log stream, and error tracing speed up debugging. |
+| Layered architecture | `config/`, `core/`, `data/`, `interact/`, `static/` keep business logic, persistence, and presentation neatly separated. |
 
-*   Python 3.8 or higher.
-*   Git
-
-### 2. Clone & Install
-
-```bash
-# Clone the repository
-git clone https://github.com/sniperrich/BotAdmin.git
-cd BotAdmin
-
-# It's recommended to use a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
+### 🧱 Project Layout
+```
+BotAdmin/
+├─ config/            # Global settings helper
+├─ data/              # SQLite helpers / data access methods
+├─ core/              # Domain logic (AI adapters, pseudocode, flow engine, runtime)
+├─ interact/          # Flask app factory, REST routes, Socket.IO bindings
+├─ static/            # SPA assets (TailwindCSS + Socket.IO client)
+├─ requirements.txt   # Python dependencies
+├─ main.py            # Dev entrypoint using socketio.run
+└─ README.md
 ```
 
-### 3. Configure Environment Variables
+### ⚙️ Prerequisites
+1. **Environment**: Python 3.10+, Git, SQLite (bundled).
+2. **Install dependencies**:
+   ```bash
+   git clone https://github.com/sniperrich/BotAdmin.git
+   cd BotAdmin
+   python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+3. **Environment variables (optional)**:
+   ```bash
+   export APP_SECRET="your_random_secret"
+   export DEEPSEEK_API_KEY="sk-xxxx"
+   export DEEPSEEK_BASE_URL="https://api.deepseek.com"
+   ```
+4. **Run the app**:
+   ```bash
+   python main.py
+   ```
+   Browse to `http://127.0.0.1:8000`.
 
-Create a file named `.env` in the project root directory and add the following content.
+### 🚀 Workflow
+1. **Sign up / Sign in** to obtain a personal workspace.
+2. **Add bots** using tokens issued by Telegram `@BotFather`.
+3. **Configure behaviour** via the Control Center tabs (Fixed commands, Flows, Pseudocode, Pro mode).
+4. **Hit “Start/Reload”** to apply changes; the WebSocket dashboard and log panel will refresh immediately.
+5. **Leverage AI** prompts to co-create command templates or pseudocode when DeepSeek/API keys are configured.
 
-```env
-# [Required] A secret key for the Flask application to secure sessions. Replace with a random string.
-# You can generate one with: python -c 'import secrets; print(secrets.token_hex(16))'
-APP_SECRET="your_strong_random_secret_string"
+### 🛠 Handy Commands
+| Use case | Command |
+| --- | --- |
+| Install dependencies | `pip install -r requirements.txt` |
+| Syntax sanity check | `python -m py_compile $(git ls-files '*.py')` |
+| Launch backend | `python main.py` |
+| DB export | `sqlite3 bot_admin.db .dump > backup.sql` |
 
-# [Optional] Configuration for AI features
-# If you want to use the AI-assisted generation, provide your DeepSeek API Key.
-# Any OpenAI-compatible key will also work.
-DEEPSEEK_API_KEY="your_deepseek_api_key"
+### 🔧 Configuration
+| Variable | Purpose |
+| --- | --- |
+| `APP_SECRET` | Flask session secret (generate your own). |
+| `BOT_ADMIN_DB` | Optional path override for the SQLite file. |
+| `DEEPSEEK_API_KEY` / `AI_API_KEY` | Enable AI-assisted generation. |
+| `DEEPSEEK_BASE_URL` / `AI_BASE_URL` | Point to any OpenAI-compatible endpoint. |
 
-# [Optional] If you are using a third-party OpenAI-compatible service, specify its Base URL.
-# DEEPSEEK_BASE_URL="https://api.deepseek.com"
-```
+### 🧭 Architecture Notes
+- **Backend**: Flask + Flask-SocketIO; REST for CRUD, WebSocket for live updates.
+- **Runtime**: `core.runtime.BotRegistry` orchestrates threaded Telegram bot workers with auto-restart and menu sync.
+- **Persistence**: `data.database` centralizes SQLite access—perfect for unit testing and future ORM migration.
+- **AI bridge**: `core.ai` wraps DeepSeek/OpenAI clients with graceful fallback templates.
+- **Frontend**: single-page app using TailwindCSS, Socket.IO, and vanilla JS components for cards, editors, and logs.
 
-### 4. Initialize & Run
+### 🧪 Testing Tips
+- Use `pytest` with temporary SQLite files to cover `core/` and `data/` logic.
+- `python -m py_compile` keeps syntax clean; check browser DevTools Network + Console for WebSocket streams.
 
-The `bot_admin.db` database file will be created automatically on the first run.
+### 🗺 Roadmap
+- [ ] Dockerized deployment stack (Dockerfile + docker-compose).
+- [ ] Flow editor import/export & collaborative templates.
+- [ ] Enhanced Pro-script sandbox with quota and API allowlists.
+- [ ] Additional AI providers (e.g., GPT-4o, Wenxin, Claude).
 
-```bash
-python app.py
-```
+### 🤝 Contributing
+1. Fork the repo & create a branch: `git checkout -b feature/awesome`
+2. Commit your changes: `git commit -m "Add awesome feature"`
+3. Push & open a pull request.
 
-The service will start on `http://127.0.0.1:8000`. You can now access it in your browser.
+### 📄 License
+Released under the [MIT License](LICENSE). Enjoy building automation for your Telegram bots!
 
-## 📖 Usage Guide
+---
 
-1.  **Register & Login**: On your first visit, register an administrator account, then log in.
-2.  **Add a Bot**:
-    *   Obtain a bot `Token` from Telegram's official `@BotFather`.
-    *   In the "My Bots" section, fill in the bot's name and token, then click "Add".
-3.  **Select & Configure**:
-    *   Click on the newly created bot card to expand the "Bot Control Center" below.
-    *   Define your bot's behavior using the **Fixed Commands**, **Flow Orchestration**, **Pro Mode**, or **Pseudocode** tabs.
-4.  **Start the Bot**: Click the **"Start/Reload"** button on the card or in the control center.
-5.  **Test**: Go to Telegram and start a conversation with your bot to test the features you've configured.
-
-> **⚠️ Important Note**: Whenever you modify any command, flow, or script, you **must** click the **"Start/Reload"** button to apply the changes to the running bot.
-
-## 🔮 Future Roadmap
-
-*   [ ] **Real-time Updates (WebSocket)**: Replace front-end polling with WebSockets for truly instantaneous logs and status updates.
-*   [ ] **Scheduled Tasks (Job Queue)**: Add a time-based trigger in "Pro Mode" to enable features like daily reports, reminders, etc.
-*   [ ] **Advanced Code Editor**: Integrate Monaco Editor or CodeMirror for "Pro Mode" to provide syntax highlighting and autocompletion.
-*   [ ] **One-Click Deployment**: Provide a `Dockerfile` and `docker-compose.yml` to simplify the deployment process.
-
-## ❤️ Contributing
-
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-1.  Fork the Project
-2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the Branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
-
-## 📄 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
+<p align="center">Made with ❤️ for builders who love automating Telegram bots.</p>
