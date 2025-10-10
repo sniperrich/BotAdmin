@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
   <style>
     @keyframes fade-in-up {
       0% { opacity: 0; transform: translateY(16px); }
@@ -265,8 +266,9 @@
   </div>
 
 <script>
-let currentUser=null, currentBotId=null, pseudoCache={};
-let _statusTimer = null, _cardsTimer = null;
+let currentUser=null, currentBotId=null, pseudoCache={}, statusCache={};
+let socket=null, socketReady=false, statusReconnectTimer=null;
+let _logTimer=null;
 let _loadBotsPending = false;
 let commandsCache=[], flowsCache=[], pseudocodeCache=[];
 let proScriptsCache = [];
@@ -467,16 +469,21 @@ function flowPseudo(compiled){
 }
 
 async function me(){
-  const r=await fetch('/api/me',{credentials:'same-origin'}); const j=await r.json();
-  currentUser=j.user;
+  const res = await fetch('/api/me',{credentials:'same-origin'});
+  const data = await res.json();
+  currentUser = data.user;
   document.getElementById('auth').classList.toggle('hidden', !!currentUser);
   document.getElementById('app').classList.toggle('hidden', !currentUser);
   if(currentUser){
-    document.getElementById('welcome').innerText=`你好，${currentUser.username}`;
+    document.getElementById('welcome').innerText = `你好，${currentUser.username}`;
     await loadBots();
-    startBotCardTimer();
+    connectStatusSocket();
+    refreshStatus();
+    if(_logTimer) clearInterval(_logTimer);
+    _logTimer = setInterval(refreshStatus, 5000);
   } else {
-    stopBotCardTimer();
+    disconnectStatusSocket();
+    if(_logTimer){ clearInterval(_logTimer); _logTimer = null; }
   }
 }
 async function registerUser(){
@@ -493,38 +500,134 @@ async function login(){
 }
 async function logout(){ await fetch('/api/logout',{method:'POST',credentials:'same-origin'}); location.reload(); }
 
-function startBotCardTimer(){
-  if(_cardsTimer) clearInterval(_cardsTimer);
-  _cardsTimer = setInterval(()=>{
-    if(currentUser){
-      loadBots();
-    }
-  }, 8000);
+function connectStatusSocket(){
+  if(!currentUser) return;
+  if(socket){
+    if(!socket.connected){ socket.connect(); }
+    return;
+  }
+  socket = io('/', {transports:['websocket'], withCredentials:true});
+  socket.on('connect', () => {
+    socketReady = true;
+    socket.emit('subscribe_status');
+  });
+  socket.on('disconnect', () => {
+    socketReady = false;
+    scheduleSocketReconnect();
+  });
+  socket.on('connect_error', (err) => {
+    console.warn('socket connect error', err);
+    scheduleSocketReconnect();
+  });
+  socket.on('auth_error', (payload) => {
+    console.warn('socket auth error', payload);
+  });
+  socket.on('bot_status', payload => {
+    applyStatusPayload(payload);
+  });
 }
 
-function stopBotCardTimer(){
-  if(_cardsTimer){
-    clearInterval(_cardsTimer);
-    _cardsTimer = null;
+function scheduleSocketReconnect(){
+  if(statusReconnectTimer || !currentUser) return;
+  statusReconnectTimer = setTimeout(() => {
+    statusReconnectTimer = null;
+    if(!currentUser) return;
+    if(socket){
+      if(!socket.connected){
+        try { socket.connect(); } catch (err) { console.warn('socket reconnect failed', err); }
+      }
+    } else {
+      connectStatusSocket();
+    }
+  }, 4000);
+}
+
+function disconnectStatusSocket(){
+  if(statusReconnectTimer){
+    clearTimeout(statusReconnectTimer);
+    statusReconnectTimer = null;
+  }
+  if(socket){
+    try { socket.disconnect(); } catch (err) { console.warn('socket disconnect error', err); }
+    socket = null;
+  }
+  socketReady = false;
+}
+
+function applyStatusPayload(payload){
+  const items = (payload && payload.items) || [];
+  const keep = new Set();
+  items.forEach(item => {
+    const id = Number(item.bot_id);
+    keep.add(id);
+    statusCache[id] = item;
+    const existing = botsCache.find(b => Number(b.id) === id);
+    if(existing){
+      if(item.name) existing.name = item.name;
+      if(item.token_mask) existing.token_mask = item.token_mask;
+    } else {
+      botsCache.push({ id, name: item.name || `Bot #${id}`, token_mask: item.token_mask || '' });
+    }
+  });
+  Object.keys(statusCache).forEach(key => {
+    const id = Number(key);
+    if(!keep.has(id)) delete statusCache[id];
+  });
+  renderBotCards();
+  updateRuntimeSummary();
+  if(currentBotId && statusCache[currentBotId]){
+    updateStatusTable(statusCache[currentBotId]);
   }
 }
 
+function updateRuntimeSummary(){
+  const wrap = document.getElementById('runtime_summary');
+  if(!wrap) return;
+  const items = Object.values(statusCache).filter(item =>
+    botsCache.some(bot => Number(bot.id) === Number(item.bot_id))
+  );
+  if(!items.length){
+    wrap.innerHTML = '<span class="text-sm text-gray-400">暂无实时状态</span>';
+    return;
+  }
+  wrap.innerHTML = items.map(it => {
+    const stats = it.stats || {};
+    const label = escapeHtml(it.name || `Bot #${it.bot_id}`);
+    const badgeClass = it.state === 'running' ? 'border-emerald-300' : 'border-gray-300';
+    return `<span class="inline-block mr-2 mb-2 px-2 py-0.5 rounded border ${badgeClass}">${label} ${badge(it.state)} <span class="text-xs text-gray-500">m:${stats.messages||0}/e:${stats.errors||0}</span></span>`;
+  }).join(' ');
+}
+
+function updateStatusTable(snapshot){
+  const table = document.getElementById('status_table');
+  if(!table) return;
+  const stats = snapshot.stats || {};
+  const lastErr = snapshot.last_error ? `<div class="text-red-600 truncate" title="${escapeHtml(snapshot.last_error)}">${escapeHtml(snapshot.last_error)}</div>` : '';
+  table.innerHTML = `
+    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">State</td><td class="py-1">${badge(snapshot.state||'stopped')}</td></tr>
+    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">Uptime</td><td class="py-1">${fmt.time(snapshot.uptime||0)}</td></tr>
+    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">Messages</td><td class="py-1">${stats.messages||0}</td></tr>
+    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">Errors</td><td class="py-1">${stats.errors||0} ${lastErr}</td></tr>
+    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">Specs/Flows</td><td class="py-1">${snapshot.specs_count||0} / ${snapshot.flows_count||0}</td></tr>
+  `;
+}
 async function loadBots(){
   if(_loadBotsPending) return botsCache;
   _loadBotsPending = true;
   try {
-    const [botsRes, statusRes] = await Promise.all([
-    fetch('/api/bots',{credentials:'same-origin'}),
-    fetch('/api/bots/status_all',{credentials:'same-origin'})
-    ]);
-    const botsJson = await botsRes.json();
-    const statusJson = await statusRes.json();
+    const res = await fetch('/api/bots',{credentials:'same-origin'});
+    const botsJson = await res.json();
     const bots = botsJson.items || [];
-    const statusItems = statusJson.items || [];
-    const statusMap = {};
-    statusItems.forEach(s => { statusMap[s.bot_id] = s; });
-    renderBotCards(bots, statusMap);
-
+    botsCache = bots;
+    const validIds = new Set(bots.map(b => Number(b.id)));
+    Object.keys(statusCache).forEach(key => {
+      if(!validIds.has(Number(key))) delete statusCache[key];
+    });
+    renderBotCards();
+    updateRuntimeSummary();
+    if(currentBotId && statusCache[currentBotId]){
+      updateStatusTable(statusCache[currentBotId]);
+    }
     if(bots.length){
       const existing = bots.find(b => Number(b.id) === Number(currentBotId));
       if(existing){
@@ -551,65 +654,109 @@ async function loadBots(){
   }
 }
 
-function renderBotCards(bots, statusMap){
-  botsCache = bots;
-  const wrap = document.getElementById('bot_cards');
-  wrap.innerHTML = '';
-  if(!bots.length){
-    wrap.innerHTML = '<div class="text-sm text-gray-500">暂无 Bot，请先创建。</div>';
-    return;
-  }
-  bots.forEach((bot, idx) => {
-    const snap = statusMap[bot.id] || {};
-    const card = document.createElement('div');
-    card.className = 'bot-card animate-card rounded-2xl border border-gray-100 bg-gradient-to-br from-white via-white to-gray-50 shadow transition-all duration-300 hover:-translate-y-1 hover:shadow-xl';
-    card.dataset.botId = bot.id;
-    const state = snap.state || 'stopped';
-    const stats = snap.stats || {messages:0, errors:0};
-    card.innerHTML = `
-      <div class="p-5 h-full flex flex-col gap-4" onclick="selectBot(${bot.id}, '${bot.name.replaceAll("'","\\'")}')">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="text-lg font-semibold text-gray-800">${escapeHtml(bot.name)}</span>
-              <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">ID ${bot.id}</span>
-            </div>
-            <p class="text-xs text-gray-400 mt-1">Token: ${escapeHtml((statusMap[bot.id] && statusMap[bot.id].token_mask) || bot.token_mask || '')}</p>
-          </div>
-          <div class="text-sm">${badge(state)}</div>
-        </div>
-        <div class="grid grid-cols-2 gap-3 text-sm text-gray-600">
-          <div>
-            <div class="text-xs text-gray-400">运行时长</div>
-            <div class="font-medium">${fmt.time(snap.uptime)}</div>
-          </div>
-          <div>
-            <div class="text-xs text-gray-400">消息 / 错误</div>
-            <div class="font-medium">${stats.messages||0} / ${stats.errors||0}</div>
-          </div>
-          <div>
-            <div class="text-xs text-gray-400">固定指令</div>
-            <div class="font-medium">${snap.specs_count||0}</div>
-          </div>
-          <div>
-            <div class="text-xs text-gray-400">流程数</div>
-            <div class="font-medium">${snap.flows_count||0}</div>
-          </div>
-        </div>
-        <div class="mt-auto flex flex-wrap gap-2 text-sm">
-          <button class="px-3 py-1.5 rounded-md bg-indigo-600 text-white transition hover:opacity-90" onclick="event.stopPropagation(); selectBot(${bot.id}, '${bot.name.replaceAll("'","\\'")}')">详情</button>
-          <button class="px-3 py-1.5 rounded-md bg-emerald-500 text-white transition hover:opacity-90" onclick="event.stopPropagation(); currentBotId=${bot.id}; startBot();">启动</button>
-          <button class="px-3 py-1.5 rounded-md bg-gray-700 text-white transition hover:opacity-90" onclick="event.stopPropagation(); currentBotId=${bot.id}; stopBot();">停止</button>
-          <button class="px-3 py-1.5 rounded-md bg-gray-200 transition hover:bg-gray-300" onclick="event.stopPropagation(); currentBotId=${bot.id}; syncMenu();">同步菜单</button>
-          <button class="px-3 py-1.5 rounded-md bg-red-50 text-red-600 transition hover:bg-red-100" onclick="event.stopPropagation(); delBot(${bot.id});">删除</button>
-        </div>
-      </div>
-    `;
-  wrap.appendChild(card);
-  });
-  highlightSelectedBot(currentBotId);
-}
+function renderBotCards() {
+    const wrap = document.getElementById('bot_cards');
+    if (!wrap) return;
 
+    const bots = botsCache || [];
+    const existingCardElements = wrap.querySelectorAll('.bot-card');
+    const cardMap = new Map();
+    existingCardElements.forEach(card => {
+        const botId = card.dataset.botId;
+        if (botId) {
+            cardMap.set(String(botId), card);
+        }
+    });
+
+    if (!bots.length) {
+        wrap.innerHTML = '<div class="text-sm text-gray-500">暂无 Bot，请先创建。</div>';
+        return;
+    }
+
+    bots.forEach(bot => {
+        const snap = statusCache[bot.id] || {};
+        const state = snap.state || 'stopped';
+        const stats = snap.stats || { messages: 0, errors: 0 };
+        const tokenMask = snap.token_mask || bot.token_mask || '';
+        const displayName = escapeHtml(bot.name || `Bot #${bot.id}`);
+        const safeName = (bot.name || `Bot #${bot.id}`).replace(/'/g, "\'");
+
+        let card = cardMap.get(String(bot.id));
+
+        if (card) {
+            // --- 卡片已存在，只更新变化的文本和样式 ---
+            // 状态徽章
+            const badgeEl = card.querySelector('.bot-status-badge');
+            if (badgeEl) badgeEl.innerHTML = badge(state);
+            // 运行时长
+            const uptimeEl = card.querySelector('.bot-uptime');
+            if (uptimeEl) uptimeEl.textContent = fmt.time(snap.uptime || 0);
+            // 消息/错误数
+            const statsEl = card.querySelector('.bot-stats');
+            if (statsEl) statsEl.textContent = `${stats.messages || 0} / ${stats.errors || 0}`;
+            // 固定指令数
+            const specsEl = card.querySelector('.bot-specs-count');
+            if (specsEl) specsEl.textContent = snap.specs_count || 0;
+            // 流程数
+            const flowsEl = card.querySelector('.bot-flows-count');
+            if (flowsEl) flowsEl.textContent = snap.flows_count || 0;
+
+            cardMap.delete(String(bot.id)); // 从map中移除，表示已处理
+        } else {
+            // --- 卡片不存在，创建新卡片 ---
+            card = document.createElement('div');
+            card.className = 'bot-card animate-card rounded-2xl border border-gray-100 bg-gradient-to-br from-white via-white to-gray-50 shadow transition-all duration-300 hover:-translate-y-1 hover:shadow-xl';
+            card.dataset.botId = bot.id;
+
+            // 为需要更新的元素添加特定的class，方便之后查找
+            card.innerHTML = `
+              <div class="p-5 h-full flex flex-col gap-4" onclick="selectBot(${bot.id}, '${safeName}')">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-lg font-semibold text-gray-800">${displayName}</span>
+                      <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">ID ${bot.id}</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">Token: ${escapeHtml(tokenMask)}</p>
+                  </div>
+                  <div class="text-sm bot-status-badge">${badge(state)}</div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 text-sm text-gray-600">
+                  <div>
+                    <div class="text-xs text-gray-400">运行时长</div>
+                    <div class="font-medium bot-uptime">${fmt.time(snap.uptime || 0)}</div>
+                  </div>
+                  <div>
+                    <div class="text-xs text-gray-400">消息 / 错误</div>
+                    <div class="font-medium bot-stats">${stats.messages || 0} / ${stats.errors || 0}</div>
+                  </div>
+                  <div>
+                    <div class="text-xs text-gray-400">固定指令</div>
+                    <div class="font-medium bot-specs-count">${snap.specs_count || 0}</div>
+                  </div>
+                  <div>
+                    <div class="text-xs text-gray-400">流程数</div>
+                    <div class="font-medium bot-flows-count">${snap.flows_count || 0}</div>
+                  </div>
+                </div>
+                <div class="mt-auto flex flex-wrap gap-2 text-sm">
+                  <button class="px-3 py-1.5 rounded-md bg-indigo-600 text-white transition hover:opacity-90" onclick="event.stopPropagation(); selectBot(${bot.id}, '${safeName}')">详情</button>
+                  <button class="px-3 py-1.5 rounded-md bg-emerald-500 text-white transition hover:opacity-90" onclick="event.stopPropagation(); currentBotId=${bot.id}; startBot();">启动</button>
+                  <button class="px-3 py-1.5 rounded-md bg-gray-700 text-white transition hover:opacity-90" onclick="event.stopPropagation(); currentBotId=${bot.id}; stopBot();">停止</button>
+                  <button class="px-3 py-1.5 rounded-md bg-gray-200 transition hover:bg-gray-300" onclick="event.stopPropagation(); currentBotId=${bot.id}; syncMenu();">同步菜单</button>
+                  <button class="px-3 py-1.5 rounded-md bg-red-50 text-red-600 transition hover:bg-red-100" onclick="event.stopPropagation(); delBot(${bot.id});">删除</button>
+                </div>
+              </div>
+            `;
+            wrap.appendChild(card);
+        }
+    });
+
+    // 如果 map 中还有剩下的卡片，说明它们对应的 bot 已被删除，需要从 DOM 中移除
+    cardMap.forEach(card => card.remove());
+
+    highlightSelectedBot(currentBotId);
+}
 function updateOverview(){
   const wrap = document.getElementById('overview_content');
   if(!wrap) return;
@@ -733,6 +880,8 @@ async function refreshOverview(){
   await Promise.all([loadCmds(), loadFlows(), loadPseudocode()]);
 }
 
+
+
 function highlightSelectedBot(id){
   const cards = document.querySelectorAll('.bot-card');
   cards.forEach(card => {
@@ -776,12 +925,12 @@ function selectBot(id, name){
   resetPseudoForm();
   loadPseudocode();
   refreshStatus();
-  if(_statusTimer) clearInterval(_statusTimer);
-  _statusTimer = setInterval(refreshStatus, 3000);
+  if(_logTimer) clearInterval(_logTimer);
+  _logTimer = setInterval(refreshStatus, 5000);
 }
 window.addEventListener('beforeunload', ()=>{
-  if(_statusTimer) clearInterval(_statusTimer);
-  if(_cardsTimer) clearInterval(_cardsTimer);
+  if(_logTimer) clearInterval(_logTimer);
+  disconnectStatusSocket();
 });
 
 /* ---------- 指令 ---------- */
@@ -991,14 +1140,11 @@ async function aiGenerateCommand(){
 async function startBot(){
   const r=await fetch(`/api/bots/${currentBotId}/start`,{method:'POST',credentials:'same-origin'}); const j=await r.json();
   document.getElementById('status').innerText=j.ok?('🚀 '+j.msg):('❌ '+(j.error||j.msg));
-  refreshStatus();
-  loadBots();
+  // refreshStatus() 和 loadBots() 已被删除
 }
 async function stopBot(){
   const r=await fetch(`/api/bots/${currentBotId}/stop`,{method:'POST',credentials:'same-origin'}); const j=await r.json();
   document.getElementById('status').innerText=j.ok?('🛑 '+j.msg):('❌ '+(j.error||j.msg));
-  refreshStatus();
-  loadBots();
 }
 async function syncMenu(){
   const r=await fetch(`/api/bots/${currentBotId}/sync`,{method:'POST',credentials:'same-origin'}); const j=await r.json();
@@ -1255,37 +1401,38 @@ function badge(state){
 }
 async function refreshStatus(){
   if(!currentBotId) return;
-  // 当前 bot 状态
-  const r1 = await fetch(`/api/bots/${currentBotId}/status`, { credentials:'same-origin' });
-  const s = (await r1.json()).status || {};
-  const tb = document.getElementById('status_table');
-  tb.innerHTML = `
-    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">State</td><td class="py-1">${badge(s.state||'stopped')}</td></tr>
-    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">Uptime</td><td class="py-1">${fmtUptime(s.uptime||0)}</td></tr>
-    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">Messages</td><td class="py-1">${(s.stats&&s.stats.messages)||0}</td></tr>
-    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">Errors</td><td class="py-1">${(s.stats&&s.stats.errors)||0} ${s.last_error?`<div class="text-red-600 truncate" title="${s.last_error}">${s.last_error}</div>`:''}</td></tr>
-    <tr class="border-t"><td class="py-1 pr-4 text-gray-500">Specs/Flows</td><td class="py-1">${s.specs_count||0} / ${s.flows_count||0}</td></tr>
-  `;
+  try {
+    if(statusCache[currentBotId]){
+      updateStatusTable(statusCache[currentBotId]);
+    }
+    const res = await fetch(`/api/bots/${currentBotId}/status`, { credentials:'same-origin' });
+    const data = await res.json();
+    const status = data.status || {};
+    const prior = statusCache[currentBotId] || {};
+    statusCache[currentBotId] = Object.assign({}, prior, status, { bot_id: currentBotId, name: prior.name || status.name });
+    updateStatusTable(statusCache[currentBotId]);
+  } catch (err) {
+    console.warn('refresh status failed', err);
+  }
 
-  // 日志
-  const r2 = await fetch(`/api/bots/${currentBotId}/logs?lines=150`, { credentials:'same-origin' });
-  const logs = (await r2.json()).items || [];
-  const box = document.getElementById('log_box');
-  box.textContent = logs.map(l=>{
-    const dt = new Date((l.ts||0)*1000).toLocaleTimeString();
-    return `[${dt}] ${l.level||'info'}: ${l.msg}`;
-  }).join('\n');
-  box.scrollTop = box.scrollHeight;
+  try {
+    const logRes = await fetch(`/api/bots/${currentBotId}/logs?lines=150`, { credentials:'same-origin' });
+    const logs = (await logRes.json()).items || [];
+    const box = document.getElementById('log_box');
+    box.textContent = logs.map(entry => {
+      const ts = new Date((entry.ts||0)*1000).toLocaleTimeString();
+      return `[${ts}] ${entry.level||'info'}: ${entry.msg}`;
+    }).join('\n');
+    box.scrollTop = box.scrollHeight;
+  } catch (err) {
+    console.warn('refresh logs failed', err);
+  }
 
-  // 汇总
-  const r3 = await fetch(`/api/bots/status_all`, { credentials:'same-origin' });
-  const all = (await r3.json()).items || [];
-  document.getElementById('runtime_summary').innerHTML =
-  all.map(it=>{
-    const stats = it.stats || {};
-    return `<span class="inline-block mr-2 mb-2 px-2 py-0.5 rounded border ${it.state==='running'?'border-emerald-300':'border-gray-300'}">${it.name} ${badge(it.state)} <span class="text-xs text-gray-500">m:${stats.messages||0}/e:${stats.errors||0}</span></span>`;
-  }).join(' ');
+  updateRuntimeSummary();
 }
+
+
+
 
 panelTabs.forEach(btn => {
   btn.addEventListener('click', (e) => {
