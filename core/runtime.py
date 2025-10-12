@@ -38,7 +38,7 @@ class BotProcess:
     def __init__(self, bot_id: int, token: str, command_specs: List[dict], *, auto_restart: bool = True):
         self.bot_id = bot_id
         self.token = token
-        self.specs = list(command_specs)
+        self.specs = self._filter_active_specs(command_specs)
         self.state = "stopped"
         self.last_error: Optional[str] = None
         self.started_at: Optional[float] = None
@@ -55,6 +55,29 @@ class BotProcess:
         self.events = deque(maxlen=200)
         self.stats = {"messages": 0, "errors": 0}
         self._log("process created")
+
+    @staticmethod
+    def _filter_active_specs(specs: List[dict]) -> List[dict]:
+        filtered: List[dict] = []
+        for spec in specs or []:
+            if not isinstance(spec, dict):
+                continue
+            raw_flag = spec.get("active", 1)
+            try:
+                flag_val = int(raw_flag)
+            except (TypeError, ValueError):
+                flag_val = 1 if raw_flag else 0
+            if flag_val == 1:
+                group_flag = spec.get("group_active")
+                if group_flag is not None:
+                    try:
+                        if int(group_flag) != 1:
+                            continue
+                    except (TypeError, ValueError):
+                        if not group_flag:
+                            continue
+                filtered.append(spec)
+        return filtered
 
     def _log(self, msg: str, level: str = "info"):
         self.events.append({"ts": time.time(), "level": level, "msg": msg})
@@ -155,7 +178,19 @@ class BotProcess:
 
     async def _make_pro_script_handlers(self):
         handlers = []
-        self._pro_scripts = [s for s in list_pro_scripts(self.bot_id) if s.get('active')]
+        self._pro_scripts = []
+        for script in list_pro_scripts(self.bot_id):
+            if not script.get('active'):
+                continue
+            group_flag = script.get('group_active')
+            if group_flag is not None:
+                try:
+                    if int(group_flag) != 1:
+                        continue
+                except (TypeError, ValueError):
+                    if not group_flag:
+                        continue
+            self._pro_scripts.append(script)
         self._log(f"pro scripts loaded: {len(self._pro_scripts)}")
 
         for script in self._pro_scripts:
@@ -326,7 +361,7 @@ class BotProcess:
         self._log("reload requested")
         self.stop()
         self.token = token
-        self.specs = list(specs)
+        self.specs = self._filter_active_specs(specs)
         return self.start()
 
     def stop(self, timeout=6.0):

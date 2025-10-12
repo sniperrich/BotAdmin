@@ -36,6 +36,16 @@
     .panel-surface {
       transition: opacity 0.2s ease;
     }
+    .group-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .group-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 14px 28px rgba(148,163,184,0.25);
+    }
+    .soft-pop {
+      animation: fade-in-up 0.32s ease-out both;
+    }
   </style>
 </head>
 <body class="bg-gray-50">
@@ -125,6 +135,9 @@
               </select>
               <input id="reply" class="border rounded-md px-3 py-2 md:col-span-3" placeholder="文本：支持 {{args}} 等变量；媒体：可做 caption">
               <input id="media_url" class="border rounded-md px-3 py-2 md:col-span-3 hidden" placeholder="媒体 URL（photo/document/animation 使用）">
+              <select id="cmd_group" class="border rounded-md px-3 py-2 md:col-span-2">
+                <option value="">分组：未指定</option>
+              </select>
               <select id="parse_mode" class="border rounded-md px-3 py-2">
                 <option value="">ParseMode: None</option>
                 <option value="MarkdownV2">MarkdownV2</option>
@@ -142,6 +155,28 @@
             <button onclick="aiGenerateCommand()" class="px-3 py-2 rounded-md bg-purple-600 text-white transition hover:-translate-y-0.5 hover:shadow">AI 生成指令</button>
           </div>
           <p class="text-xs text-gray-400 mb-3">提示：若已配置 <code>DEEPSEEK_API_KEY</code> 或 <code>AI_API_KEY</code>，将调用 DeepSeek AI；否则使用内置模板。</p>
+          <details class="rounded-xl border border-indigo-100 bg-white/80 p-4 mb-4" open>
+            <summary class="flex items-center justify-between cursor-pointer select-none text-sm font-medium text-gray-700">
+              <span>指令分组</span>
+              <span class="text-xs text-gray-400">可为固定指令建立主题分组并集中启停</span>
+            </summary>
+            <div class="mt-3">
+              <div id="group-list-commands" class="grid gap-3 md:grid-cols-2"></div>
+            </div>
+            <div class="grid md:grid-cols-4 gap-3 mt-4">
+              <input type="hidden" id="group_form_commands_id">
+              <input id="group_form_commands_name" class="border rounded-md px-3 py-2 md:col-span-2" placeholder="分组名称，例如：欢迎与问候">
+              <textarea id="group_form_commands_desc" class="border rounded-md px-3 py-2 md:col-span-2 h-20" placeholder="分组说明（选填）"></textarea>
+              <label class="inline-flex items-center gap-2 text-sm text-gray-600">
+                <input type="checkbox" id="group_form_commands_active" checked> 启用分组
+              </label>
+              <div class="flex gap-2 md:col-span-3">
+                <button onclick="saveGroup('commands')" class="px-3 py-2 rounded-md bg-indigo-600 text-white transition hover:-translate-y-0.5 hover:shadow">保存分组</button>
+                <button onclick="resetGroupForm('commands')" class="px-3 py-2 rounded-md bg-gray-100 text-gray-700 transition hover:bg-gray-200">重置</button>
+              </div>
+              <div id="group_form_commands_status" class="text-xs text-indigo-500 md:col-span-4"></div>
+            </div>
+          </details>
           <div id="cmd_cards" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"></div>
         </div>
          <div id="panel-pro" class="panel-surface hidden">
@@ -155,6 +190,9 @@
               <input id="pro_command" class="border rounded-md px-3 py-2 md:col-span-2" placeholder="触发命令，例如：/daily">
               <textarea id="pro_code" class="code-editor border rounded-md px-3 py-2 md:col-span-4 h-48" placeholder="# 你的代码会包装在 async def handler(bot, update, context, log) 中&#10;# log('hello')&#10;await update.message.reply_text(f'Hello, {update.effective_user.first_name}')"></textarea>
               <input type="hidden" id="pro_id">
+              <select id="pro_group" class="border rounded-md px-3 py-2 md:col-span-2">
+                <option value="">分组：未指定</option>
+              </select>
               <div class="flex items-center justify-between md:col-span-4">
                 <label class="inline-flex items-center gap-2"><input id="pro_active" type="checkbox" checked> <span class="text-sm text-gray-600">启用</span></label>
                 <div class="flex gap-2">
@@ -166,9 +204,31 @@
           </details>
           <div id="pro_status" class="text-sm text-gray-600 my-3"></div>
           <table class="w-full text-sm">
-            <thead><tr class="text-left text-gray-500"><th class="py-2 w-32">名称</th><th class="w-32">命令</th><th>代码摘要</th><th class="w-24">状态</th><th class="w-32">操作</th></tr></thead>
+            <thead><tr class="text-left text-gray-500"><th class="py-2 w-32">名称</th><th class="w-32">命令</th><th class="w-32">分组</th><th>代码摘要</th><th class="w-24">状态</th><th class="w-32">操作</th></tr></thead>
             <tbody id="pro_scripts_table"></tbody>
           </table>
+          <details class="rounded-xl border border-indigo-100 bg-white/80 p-4 mt-4" open>
+            <summary class="flex items-center justify-between cursor-pointer select-none text-sm font-medium text-gray-700">
+              <span>Pro 脚本分组</span>
+              <span class="text-xs text-gray-400">管理脚本集合的启停与说明</span>
+            </summary>
+            <div class="mt-3">
+              <div id="group-list-pro" class="grid gap-3 md:grid-cols-2"></div>
+            </div>
+            <div class="grid md:grid-cols-4 gap-3 mt-4">
+              <input type="hidden" id="group_form_pro_id">
+              <input id="group_form_pro_name" class="border rounded-md px-3 py-2 md:col-span-2" placeholder="分组名称，例如：后台维护">
+              <textarea id="group_form_pro_desc" class="border rounded-md px-3 py-2 md:col-span-2 h-20" placeholder="分组说明（选填）"></textarea>
+              <label class="inline-flex items-center gap-2 text-sm text-gray-600">
+                <input type="checkbox" id="group_form_pro_active" checked> 启用分组
+              </label>
+              <div class="flex gap-2 md:col-span-3">
+                <button onclick="saveGroup('pro_scripts')" class="px-3 py-2 rounded-md bg-indigo-600 text-white transition hover:-translate-y-0.5 hover:shadow">保存分组</button>
+                <button onclick="resetGroupForm('pro_scripts')" class="px-3 py-2 rounded-md bg-gray-100 text-gray-700 transition hover:bg-gray-200">重置</button>
+              </div>
+              <div id="group_form_pro_status" class="text-xs text-indigo-500 md:col-span-4"></div>
+            </div>
+          </details>
         </div>
         <div id="panel-flows" class="panel-surface hidden">
           <details class="rounded-xl border border-gray-200 bg-gray-50 p-4" open>
@@ -182,6 +242,28 @@
             </div>
           </details>
           <p class="text-xs text-gray-400 mt-3 mb-3">提示：Blockly 中保存后会回写到数据库，再点击“发布”即可让运行中的 Bot 重载最新流程。</p>
+          <details class="rounded-xl border border-emerald-100 bg-white/80 p-4 mb-4" open>
+            <summary class="flex items-center justify-between cursor-pointer select-none text-sm font-medium text-gray-700">
+              <span>流程分组</span>
+              <span class="text-xs text-gray-400">批量启停复杂流程集合</span>
+            </summary>
+            <div class="mt-3">
+              <div id="group-list-flows" class="grid gap-3 md:grid-cols-2"></div>
+            </div>
+            <div class="grid md:grid-cols-4 gap-3 mt-4">
+              <input type="hidden" id="group_form_flows_id">
+              <input id="group_form_flows_name" class="border rounded-md px-3 py-2 md:col-span-2" placeholder="分组名称，例如：售前流程">
+              <textarea id="group_form_flows_desc" class="border rounded-md px-3 py-2 md:col-span-2 h-20" placeholder="分组说明（选填）"></textarea>
+              <label class="inline-flex items-center gap-2 text-sm text-gray-600">
+                <input type="checkbox" id="group_form_flows_active" checked> 启用分组
+              </label>
+              <div class="flex gap-2 md:col-span-3">
+                <button onclick="saveGroup('flows')" class="px-3 py-2 rounded-md bg-emerald-600 text-white transition hover:-translate-y-0.5 hover:shadow">保存分组</button>
+                <button onclick="resetGroupForm('flows')" class="px-3 py-2 rounded-md bg-gray-100 text-gray-700 transition hover:bg-gray-200">重置</button>
+              </div>
+              <div id="group_form_flows_status" class="text-xs text-emerald-500 md:col-span-4"></div>
+            </div>
+          </details>
           <div id="flow_cards" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"></div>
         </div>
 
@@ -196,6 +278,9 @@
               <textarea id="pseudo_content" class="border rounded-md px-3 py-2 md:col-span-3 h-32" placeholder="使用中文伪代码描述 Bot 行为，例如：
 1. 用户发送 /start
 2. 机器人发送欢迎文本..." ></textarea>
+              <select id="pseudo_group" class="border rounded-md px-3 py-2 md:col-span-1">
+                <option value="">分组：未指定</option>
+              </select>
               <input type="hidden" id="pseudo_id">
               <div class="flex gap-2 md:col-start-4">
                 <button onclick="savePseudocode()" class="flex-1 px-3 py-2 rounded-md bg-indigo-600 text-white">保存/更新伪代码</button>
@@ -214,9 +299,31 @@
             <button onclick="sandboxPseudo(document.getElementById('pseudo_id').value||null)" class="px-3 py-2 rounded-md bg-slate-800 text-white transition hover:-translate-y-0.5 hover:shadow">对当前内容沙盒演练</button>
           </div>
           <table class="w-full text-sm">
-            <thead><tr class="text-left text-gray-500"><th class="py-2 w-16">ID</th><th class="w-48">标题</th><th>内容摘要</th><th class="w-48">操作</th></tr></thead>
+            <thead><tr class="text-left text-gray-500"><th class="py-2 w-16">ID</th><th class="w-48">标题</th><th>内容摘要</th><th class="w-32">分组</th><th class="w-20">状态</th><th class="w-56">操作</th></tr></thead>
             <tbody id="pseudocode_table"></tbody>
           </table>
+          <details class="rounded-xl border border-indigo-100 bg-white/80 p-4 mt-4" open>
+            <summary class="flex items-center justify-between cursor-pointer select-none text-sm font-medium text-gray-700">
+              <span>伪代码分组</span>
+              <span class="text-xs text-gray-400">组织伪代码草稿，便于批量启停</span>
+            </summary>
+            <div class="mt-3">
+              <div id="group-list-pseudo" class="grid gap-3 md:grid-cols-2"></div>
+            </div>
+            <div class="grid md:grid-cols-4 gap-3 mt-4">
+              <input type="hidden" id="group_form_pseudo_id">
+              <input id="group_form_pseudo_name" class="border rounded-md px-3 py-2 md:col-span-2" placeholder="分组名称，例如：模板草稿">
+              <textarea id="group_form_pseudo_desc" class="border rounded-md px-3 py-2 md:col-span-2 h-20" placeholder="分组说明（选填）"></textarea>
+              <label class="inline-flex items-center gap-2 text-sm text-gray-600">
+                <input type="checkbox" id="group_form_pseudo_active" checked> 启用分组
+              </label>
+              <div class="flex gap-2 md:col-span-3">
+                <button onclick="saveGroup('pseudocode')" class="px-3 py-2 rounded-md bg-indigo-600 text-white transition hover:-translate-y-0.5 hover:shadow">保存分组</button>
+                <button onclick="resetGroupForm('pseudocode')" class="px-3 py-2 rounded-md bg-gray-100 text-gray-700 transition hover:bg-gray-200">重置</button>
+              </div>
+              <div id="group_form_pseudo_status" class="text-xs text-indigo-500 md:col-span-4"></div>
+            </div>
+          </details>
           <div class="mt-4">
             <h4 class="text-sm font-medium text-gray-600 mb-2">沙盒演练输出</h4>
             <pre id="sandbox_output" class="hidden bg-slate-900 text-sky-200 text-xs rounded-lg p-3 leading-5 whitespace-pre-wrap"></pre>
@@ -272,6 +379,52 @@ let _logTimer=null;
 let _loadBotsPending = false;
 let commandsCache=[], flowsCache=[], pseudocodeCache=[];
 let proScriptsCache = [];
+const featureGroups = {
+  commands: [],
+  flows: [],
+  pro_scripts: [],
+  pseudocode: [],
+};
+const GROUP_LABELS = {
+  commands: '固定指令',
+  flows: '流程编排',
+  pro_scripts: 'Pro 脚本',
+  pseudocode: '中文伪代码',
+};
+const GROUP_FORMS = {
+  commands: {
+    container: 'group-list-commands',
+    id: 'group_form_commands_id',
+    name: 'group_form_commands_name',
+    desc: 'group_form_commands_desc',
+    active: 'group_form_commands_active',
+    status: 'group_form_commands_status',
+  },
+  flows: {
+    container: 'group-list-flows',
+    id: 'group_form_flows_id',
+    name: 'group_form_flows_name',
+    desc: 'group_form_flows_desc',
+    active: 'group_form_flows_active',
+    status: 'group_form_flows_status',
+  },
+  pro_scripts: {
+    container: 'group-list-pro',
+    id: 'group_form_pro_id',
+    name: 'group_form_pro_name',
+    desc: 'group_form_pro_desc',
+    active: 'group_form_pro_active',
+    status: 'group_form_pro_status',
+  },
+  pseudocode: {
+    container: 'group-list-pseudo',
+    id: 'group_form_pseudo_id',
+    name: 'group_form_pseudo_name',
+    desc: 'group_form_pseudo_desc',
+    active: 'group_form_pseudo_active',
+    status: 'group_form_pseudo_status',
+  },
+};
 const fmt = {
   time(seconds){
     const sec = Number(seconds||0);
@@ -325,6 +478,33 @@ function parseFlowCompiled(raw){
   return (data && typeof data === 'object') ? data : null;
 }
 
+function isActiveFlag(val){
+  try {
+    const n = Number(val);
+    return Number.isNaN(n) ? !!val : n === 1;
+  } catch(e){
+    return !!val;
+  }
+}
+
+function isGroupActive(flag){
+  try {
+    return Number(flag ?? 1) === 1;
+  } catch(e){
+    return !!flag;
+  }
+}
+
+function isEffectivelyActive(item){
+  if(!item) return false;
+  if(Object.prototype.hasOwnProperty.call(item, 'effective_active')){
+    return !!item.effective_active;
+  }
+  const active = !!item.active;
+  if(!active) return false;
+  return isGroupActive(item.group_active);
+}
+
 let botsCache=[];
 
 function toggleDetails(id){
@@ -332,6 +512,209 @@ function toggleDetails(id){
   if(!el) return;
   el.classList.toggle('hidden');
   el.classList.toggle('animate-card');
+}
+
+function normalizeGroupId(value){
+  if(value === undefined || value === null) return null;
+  if(typeof value === 'number' && Number.isFinite(value)){
+    return value > 0 ? Math.trunc(value) : null;
+  }
+  const str = String(value).trim();
+  if(!str || str.toLowerCase() === 'null') return null;
+  const num = Number(str);
+  if(Number.isFinite(num) && num > 0) return Math.trunc(num);
+  return null;
+}
+
+function renderGroupOptions(kind, selected){
+  const groups = featureGroups[kind] || [];
+  let html = '<option value="">无分组</option>';
+  groups.forEach(g => {
+    const flag = Number(g.active ?? 1) === 1;
+    const sel = selected && Number(g.id) === Number(selected) ? 'selected' : '';
+    const suffix = flag ? '' : '（停用）';
+    html += `<option value="${g.id}" ${sel}>${escapeHtml(g.name)}${suffix}</option>`;
+  });
+  return html;
+}
+
+function refreshGroupSelects(kind){
+  const selectMap = {
+    commands: ['cmd_group'],
+    pro_scripts: ['pro_group'],
+    pseudocode: ['pseudo_group'],
+  };
+  const ids = selectMap[kind];
+  if(!ids) return;
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    const current = normalizeGroupId(el.value);
+    el.innerHTML = renderGroupOptions(kind, current);
+    el.value = current ?? '';
+  });
+}
+
+function renderGroupList(kind){
+  const config = GROUP_FORMS[kind];
+  if(!config) return;
+  const container = document.getElementById(config.container);
+  if(!container) return;
+  const groups = featureGroups[kind] || [];
+  if(!groups.length){
+    container.innerHTML = `<div class="text-xs text-gray-400">暂无${GROUP_LABELS[kind]}分组，先创建一个吧～</div>`;
+    return;
+  }
+  container.innerHTML = groups.map(g => {
+    const flag = Number(g.active ?? 1) === 1;
+    const badgeClass = flag ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500';
+    const toggleText = flag ? '停用' : '启用';
+    const toggleColor = flag ? 'text-amber-600 hover:text-amber-700' : 'text-emerald-600 hover:text-emerald-700';
+    const desc = g.description ? `<p class="text-xs text-gray-500 mt-2">${escapeHtml(g.description)}</p>` : '';
+    return `
+      <div class="group-card soft-pop rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-gray-800">${escapeHtml(g.name)}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full ${badgeClass}">${flag ? '启用' : '停用'}</span>
+            </div>
+            <div class="text-xs text-gray-400 mt-1">包含 ${g.item_count || 0} 项｜启用 ${g.active_item_count || 0} 项</div>
+            ${desc}
+          </div>
+          <div class="flex flex-col items-end gap-1 text-xs text-gray-400">
+            <button class="text-indigo-600 hover:text-indigo-700" onclick="editGroup('${kind}', ${g.id})">编辑</button>
+            <button class="${toggleColor}" onclick="setFeatureGroupActive('${kind}', ${g.id}, ${flag ? 'false' : 'true'})">${toggleText}</button>
+            <button class="text-red-500 hover:text-red-600" onclick="deleteGroup('${kind}', ${g.id})">删除</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function groupStatus(kind, message){
+  const config = GROUP_FORMS[kind];
+  if(!config) return;
+  const el = document.getElementById(config.status);
+  if(el) el.innerText = message || '';
+}
+
+function resetGroupForm(kind){
+  const config = GROUP_FORMS[kind];
+  if(!config) return;
+  const idEl = document.getElementById(config.id);
+  const nameEl = document.getElementById(config.name);
+  const descEl = document.getElementById(config.desc);
+  const activeEl = document.getElementById(config.active);
+  if(idEl) idEl.value = '';
+  if(nameEl) nameEl.value = '';
+  if(descEl) descEl.value = '';
+  if(activeEl) activeEl.checked = true;
+  groupStatus(kind, '');
+}
+
+function editGroup(kind, id){
+  const groups = featureGroups[kind] || [];
+  const config = GROUP_FORMS[kind];
+  if(!config) return;
+  const target = groups.find(item => Number(item.id) === Number(id));
+  if(!target) return;
+  document.getElementById(config.id).value = target.id;
+  document.getElementById(config.name).value = target.name || '';
+  document.getElementById(config.desc).value = target.description || '';
+  document.getElementById(config.active).checked = Number(target.active ?? 1) === 1;
+  groupStatus(kind, `✏️ 编辑分组：${target.name}`);
+}
+
+async function saveGroup(kind){
+  if(!currentBotId){ alert('请先选择一个 Bot'); return; }
+  const config = GROUP_FORMS[kind];
+  if(!config) return;
+  const id = document.getElementById(config.id).value || undefined;
+  const name = document.getElementById(config.name).value.trim();
+  const description = document.getElementById(config.desc).value.trim();
+  const active = document.getElementById(config.active).checked;
+  if(!name){
+    groupStatus(kind, '❌ 请输入分组名称');
+    return;
+  }
+  const payload = { name, description, active };
+  if(id) payload.id = Number(id);
+  const r = await fetch(`/api/bots/${currentBotId}/groups/${kind}`, {
+    method:'POST',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const j = await r.json();
+  if(j.ok){
+    groupStatus(kind, '✅ 分组已保存');
+    resetGroupForm(kind);
+    await loadFeatureGroups(kind);
+    if(kind === 'commands') loadCmds();
+    if(kind === 'flows') loadFlows();
+    if(kind === 'pro_scripts') loadProScripts();
+    if(kind === 'pseudocode') loadPseudocode();
+  } else {
+    groupStatus(kind, `❌ ${j.error || '保存失败'}`);
+  }
+}
+
+async function loadFeatureGroups(kind){
+  if(!currentBotId) return;
+  const r = await fetch(`/api/bots/${currentBotId}/groups/${kind}`, { credentials:'same-origin' });
+  const j = await r.json();
+  featureGroups[kind] = j.items || [];
+  renderGroupList(kind);
+  refreshGroupSelects(kind);
+}
+
+async function loadAllGroups(){
+  if(!currentBotId) return;
+  await Promise.all([
+    loadFeatureGroups('commands'),
+    loadFeatureGroups('flows'),
+    loadFeatureGroups('pro_scripts'),
+    loadFeatureGroups('pseudocode'),
+  ]);
+}
+
+async function setFeatureGroupActive(kind, groupId, active){
+  const r = await fetch(`/api/bots/${currentBotId}/groups/${groupId}/active`, {
+    method:'PATCH',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ active })
+  });
+  const j = await r.json();
+  if(!j.ok){
+    groupStatus(kind, `❌ ${j.error || '更新失败'}`);
+    return;
+  }
+  await loadFeatureGroups(kind);
+  if(kind === 'commands') loadCmds();
+  if(kind === 'flows') loadFlows();
+  if(kind === 'pro_scripts') loadProScripts();
+  if(kind === 'pseudocode') loadPseudocode();
+}
+
+async function deleteGroup(kind, groupId){
+  if(!confirm('确认删除该分组？\n提示：已关联的条目会自动解除关联。')) return;
+  const r = await fetch(`/api/bots/${currentBotId}/groups/${groupId}`, {
+    method:'DELETE',
+    credentials:'same-origin'
+  });
+  const j = await r.json();
+  if(!j.ok){
+    groupStatus(kind, `❌ ${j.error || '删除失败'}`);
+    return;
+  }
+  groupStatus(kind, '🗑️ 分组已删除');
+  await loadFeatureGroups(kind);
+  if(kind === 'commands') loadCmds();
+  if(kind === 'flows') loadFlows();
+  if(kind === 'pro_scripts') loadProScripts();
+  if(kind === 'pseudocode') loadPseudocode();
 }
 
 const panelSections = {
@@ -765,19 +1148,25 @@ function updateOverview(){
     wrap.innerHTML = '<div class="text-gray-500">暂无数据，请先加载 Bot 配置。</div>';
     return;
   }
+  const activeCommands = commandsCache.filter(isEffectivelyActive).length;
+  const activeFlows = flowsCache.filter(isEffectivelyActive).length;
+  const activePseudos = pseudocodeCache.filter(isEffectivelyActive).length;
   const summary = `
     <div class="grid md:grid-cols-3 gap-3 text-xs text-gray-500 mb-3">
       <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
         <div class="text-xs uppercase tracking-wide text-gray-400">固定指令</div>
-        <div class="text-lg font-semibold text-gray-800">${commandsCache.length}</div>
+        <div class="text-lg font-semibold text-gray-800">${activeCommands} / ${commandsCache.length}</div>
+        <div class="text-xs text-gray-400 mt-1">已启用 / 总数</div>
       </div>
       <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
         <div class="text-xs uppercase tracking-wide text-gray-400">流程编排</div>
-        <div class="text-lg font-semibold text-gray-800">${flowsCache.length}</div>
+        <div class="text-lg font-semibold text-gray-800">${activeFlows} / ${flowsCache.length}</div>
+        <div class="text-xs text-gray-400 mt-1">已启用 / 总数</div>
       </div>
       <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
         <div class="text-xs uppercase tracking-wide text-gray-400">中文伪代码</div>
-        <div class="text-lg font-semibold text-gray-800">${pseudocodeCache.length}</div>
+        <div class="text-lg font-semibold text-gray-800">${activePseudos} / ${pseudocodeCache.length}</div>
+        <div class="text-xs text-gray-400 mt-1">已启用 / 总数</div>
       </div>
     </div>`;
 
@@ -798,7 +1187,10 @@ function updateOverview(){
         <details class="rounded-lg border border-gray-200 bg-white/70 p-3">
           <summary class="flex items-center justify-between text-sm font-medium text-gray-700 cursor-pointer select-none">
             <span>${escapeHtml(cmd.command)}</span>
-            <span class="text-xs text-gray-400">${escapeHtml(cmd.kind || 'text')}</span>
+            <span class="flex items-center gap-2 text-xs text-gray-400">
+              <span>${escapeHtml(cmd.kind || 'text')}</span>
+              <span class="px-2 py-0.5 rounded-full ${cmd.active ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'}">${cmd.active ? '启用' : '停用'}</span>
+            </span>
           </summary>
           <div class="grid md:grid-cols-2 gap-3 mt-2 text-xs">
             <div>
@@ -827,7 +1219,7 @@ function updateOverview(){
         <details class="rounded-lg border border-gray-200 bg-white/70 p-3">
           <summary class="flex items-center justify-between text-sm font-medium text-gray-700 cursor-pointer select-none">
             <span>${escapeHtml(flow.name)}</span>
-            <span class="text-xs text-gray-400">${flow.active ? '启用' : '停用'}</span>
+            <span class="px-2 py-0.5 rounded-full text-xs ${flow.active ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'}">${flow.active ? '启用' : '停用'}</span>
           </summary>
           <div class="grid md:grid-cols-2 gap-3 mt-2 text-xs">
             <div>
@@ -856,7 +1248,10 @@ function updateOverview(){
         <details class="rounded-lg border border-gray-200 bg-white/70 p-3">
           <summary class="flex items-center justify-between text-sm font-medium text-gray-700 cursor-pointer select-none">
             <span>${escapeHtml(item.title || '未命名伪代码')}</span>
-            <span class="text-xs text-gray-400">ID ${item.id}</span>
+            <span class="flex items-center gap-2 text-xs text-gray-400">
+              <span>ID ${item.id}</span>
+              <span class="px-2 py-0.5 rounded-full ${item.active ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'}">${item.active ? '启用' : '停用'}</span>
+            </span>
           </summary>
           <div class="mt-2 text-xs text-gray-600 whitespace-pre-wrap bg-amber-50 text-amber-900 rounded-lg p-3">${escapeHtml(preview)}</div>
         </details>`;
@@ -919,6 +1314,11 @@ function selectBot(id, name){
   currentBotId=id;
   document.getElementById('current_bot').innerText=`（当前：${name} #${id}）`;
   highlightSelectedBot(id);
+  resetGroupForm('commands');
+  resetGroupForm('flows');
+  resetGroupForm('pro_scripts');
+  resetGroupForm('pseudocode');
+  loadAllGroups();
   loadCmds();
   loadFlows();
   loadProScripts(); // 新增
@@ -939,6 +1339,8 @@ function resetProForm(){
   document.getElementById('pro_name').value = '';
   document.getElementById('pro_command').value = '';
   document.getElementById('pro_code').value = '';
+  const proGroup = document.getElementById('pro_group');
+  if(proGroup) proGroup.value = '';
   document.getElementById('pro_active').checked = true;
   document.getElementById('pro_status').innerText = '';
 }
@@ -949,17 +1351,38 @@ async function loadProScripts() {
     const j = await r.json();
     const tb = document.getElementById('pro_scripts_table');
     tb.innerHTML = '';
-    proScriptsCache = j.items || [];
+    proScriptsCache = (j.items || []).map(it => {
+        const active = isActiveFlag(it.active);
+        const groupActive = Number(it.group_active ?? 1) === 1;
+        return {
+            ...it,
+            active,
+            group_active: it.group_active,
+            effective_active: active && groupActive,
+        };
+    });
 
     proScriptsCache.forEach(it => {
         const tr = document.createElement('tr');
         tr.className = 'border-t';
         const excerpt = (it.code || '').split('\n')[0].slice(0, 50) + '...';
+        const gid = normalizeGroupId(it.group_id);
+        const groupSelect = `<select class="border rounded-md px-2 py-1 text-xs" onchange="setProScriptGroup(${it.id}, normalizeGroupId(this.value));">
+            ${renderGroupOptions('pro_scripts', gid)}
+        </select>`;
+        const groupActive = Number(it.group_active ?? 1) === 1;
+        const isActive = !!it.active;
+        const stateText = !isActive ? '停用' : (groupActive ? '启用' : '组停用');
+        const stateClass = !isActive
+          ? 'bg-gray-100 text-gray-500'
+          : (groupActive ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-700');
         tr.innerHTML = `<td class="py-2">${escapeHtml(it.name)}</td>
             <td><code>${escapeHtml(it.command)}</code></td>
+            <td>${groupSelect}</td>
             <td class="text-gray-500"><code>${escapeHtml(excerpt)}</code></td>
-            <td><span class="text-xs px-2 py-0.5 rounded-full ${it.active ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'}">${it.active ? '启用' : '停用'}</span></td>
+            <td><span class="text-xs px-2 py-0.5 rounded-full ${stateClass}">${stateText}</span></td>
             <td class="space-x-2">
+                <button class="text-sm ${isActive ? 'text-amber-600 hover:text-amber-700' : 'text-emerald-600 hover:text-emerald-700'}" onclick="setProScriptActive(${it.id}, ${isActive ? 'false' : 'true'})">${isActive ? '停用' : '启用'}</button>
                 <button class="text-sm text-indigo-600" onclick="editProScript(${it.id})">编辑</button>
                 <button class="text-sm text-red-600" onclick="deleteProScript(${it.id})">删除</button>
             </td>`;
@@ -974,6 +1397,12 @@ function editProScript(id) {
     document.getElementById('pro_name').value = script.name;
     document.getElementById('pro_command').value = script.command;
     document.getElementById('pro_code').value = script.code;
+    const groupSelect = document.getElementById('pro_group');
+    if(groupSelect){
+        const gid = normalizeGroupId(script.group_id);
+        groupSelect.innerHTML = renderGroupOptions('pro_scripts', gid);
+        groupSelect.value = gid ?? '';
+    }
     document.getElementById('pro_active').checked = !!script.active;
     document.getElementById('pro_status').innerText = `✏️ 编辑脚本: ${script.name}`;
     setActivePanel('pro');
@@ -987,6 +1416,7 @@ async function saveProScript() {
         command: document.getElementById('pro_command').value,
         code: document.getElementById('pro_code').value,
         active: document.getElementById('pro_active').checked,
+        group_id: normalizeGroupId(document.getElementById('pro_group').value),
     };
     if (id) payload.id = Number(id);
 
@@ -1016,13 +1446,52 @@ async function deleteProScript(id) {
     statusEl.innerText = j.ok ? '🗑️ 脚本已删除。' : `❌ 删除失败: ${j.error || '未知错误'}`;
     loadProScripts();
 }
+
+async function setProScriptActive(id, active){
+    if(!currentBotId) return;
+    const r = await fetch(`/api/bots/${currentBotId}/pro_scripts/${id}/active`, {
+        method:'PATCH',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ active: !!active }),
+    });
+    const j = await r.json();
+    const statusEl = document.getElementById('pro_status');
+    statusEl.innerText = j.ok ? (active ? '✅ 脚本已启用' : '⏸️ 脚本已停用') : `❌ 操作失败: ${j.error || '未知错误'}`;
+    if(j.ok){ loadProScripts(); refreshStatus(); }
+}
+
+async function setProScriptGroup(id, groupId){
+    if(!currentBotId) return;
+    const r = await fetch(`/api/bots/${currentBotId}/pro_scripts/${id}/group`, {
+        method:'PATCH',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ group_id: groupId })
+    });
+    const j = await r.json();
+    const statusEl = document.getElementById('pro_status');
+    statusEl.innerText = j.ok ? '🔗 分组已更新' : `❌ 操作失败: ${j.error || '未知错误'}`;
+    if(j.ok){ loadProScripts(); }
+}
 async function loadCmds(){
   if(!currentBotId) return;
-  const r=await fetch(`/api/bots/${currentBotId}/commands`,{credentials:'same-origin'}); const j=await r.json();
-  const wrap=document.getElementById('cmd_cards');
-  wrap.innerHTML='';
-  const items = j.items || [];
-  commandsCache = items.map(it => ({...it}));
+  const r = await fetch(`/api/bots/${currentBotId}/commands`, { credentials:'same-origin' });
+  const j = await r.json();
+  const wrap = document.getElementById('cmd_cards');
+  wrap.innerHTML = '';
+  const rawItems = j.items || [];
+  const items = rawItems.map(it => {
+    const active = isActiveFlag(it.active);
+    const groupActive = Number(it.group_active ?? 1) === 1;
+    return {
+      ...it,
+      active,
+      group_active: it.group_active,
+      effective_active: active && groupActive,
+    };
+  });
+  commandsCache = items;
   if(!items.length){
     wrap.innerHTML = '<div class="text-sm text-gray-500">暂无固定指令，先在上方添加一个吧～</div>';
     updateOverview();
@@ -1032,7 +1501,14 @@ async function loadCmds(){
     const payloadParsed = parseMaybeJson(it.payload) || {};
     const card = document.createElement('div');
     const domId = `${it.id||idx}`;
-    card.className='animate-card rounded-2xl border border-gray-100 bg-white shadow transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl';
+    const isActive = !!it.active;
+    const groupActive = Number(it.group_active ?? 1) === 1;
+    const effectiveActive = isActive && groupActive;
+    const stateText = !isActive ? '停用' : (groupActive ? '启用' : '组停用');
+    const stateClass = !isActive
+      ? 'bg-gray-100 text-gray-500'
+      : (groupActive ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-700');
+    const commandId = Number.isFinite(Number(it.id)) ? Number(it.id) : null;
     const pseudo = commandPseudo({...it, payload: payloadParsed});
     const codeJson = prettyJson({
       command: it.command,
@@ -1040,8 +1516,21 @@ async function loadCmds(){
       reply: it.reply,
       parse_mode: it.parse_mode,
       disable_preview: it.disable_preview,
-      payload: payloadParsed
+      payload: payloadParsed,
     });
+    const stateBadge = `<span class="text-xs px-2 py-0.5 rounded-full ${stateClass}">${stateText}</span>`;
+    const toggleBtn = commandId === null ? '' : `<button class="text-xs text-${isActive ? 'amber' : 'emerald'}-600 hover:text-${isActive ? 'amber' : 'emerald'}-700" onclick="setCommandActive(${commandId}, ${isActive ? 'false' : 'true'}); event.stopPropagation();">${isActive ? '停用' : '启用'}</button>`;
+    const groupBadge = it.group_name
+      ? `<span class="text-xs px-2 py-0.5 rounded-full ${groupActive ? 'bg-sky-100 text-sky-600' : 'bg-orange-100 text-orange-600'}">${escapeHtml(it.group_name)}${groupActive ? '' : '（组停用）'}</span>`
+      : `<span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">未分组</span>`;
+    const groupSelect = commandId === null ? '' : `
+      <label class="flex items-center gap-2 text-xs text-gray-500">
+        <span>分组</span>
+        <select class="border rounded-md px-2 py-1 text-sm" onchange="setCommandGroup(${commandId}, normalizeGroupId(this.value)); event.stopPropagation();">
+          ${renderGroupOptions('commands', it.group_id)}
+        </select>
+      </label>`;
+    card.className='animate-card rounded-2xl border border-gray-100 bg-white shadow transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl';
     card.innerHTML = `
       <div class="p-4 flex flex-col gap-3">
         <div class="flex items-start justify-between gap-3">
@@ -1049,10 +1538,18 @@ async function loadCmds(){
             <h3 class="text-base font-semibold text-gray-800 flex items-center gap-2">
               ${escapeHtml(it.command)}
               <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">${escapeHtml(it.kind||'text')}</span>
+              ${stateBadge}
             </h3>
             <p class="text-xs text-gray-400 mt-1">ParseMode: ${it.parse_mode || 'None'} ｜ 预览：${it.disable_preview? '关闭':'开启'}</p>
+            <div class="flex items-center gap-2 mt-2 text-xs">
+              ${groupBadge}
+              ${groupSelect}
+            </div>
           </div>
-          <button class="text-sm text-red-500 hover:text-red-600" onclick="delCmd('${it.command.replaceAll("'","\\'")}'); event.stopPropagation();">删除</button>
+          <div class="flex flex-col items-end gap-1 text-xs text-gray-400">
+            ${toggleBtn}
+            <button class="text-red-500 hover:text-red-600" onclick="delCmd('${it.command.replaceAll("'","\\'")}'); event.stopPropagation();">删除</button>
+          </div>
         </div>
         <div class="text-sm text-gray-600">
           ${(it.reply || payloadParsed.text || '').slice(0,80) || '（无默认文本）'}
@@ -1084,12 +1581,13 @@ async function saveCmd(){
   } else {
     payload = { url: media_url || '', caption: reply || '' };
   }
+  const group_id = normalizeGroupId(document.getElementById('cmd_group').value);
 
   const r = await fetch(`/api/bots/${currentBotId}/commands`,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     credentials:'same-origin',
-    body: JSON.stringify({ command, kind, reply, payload, parse_mode, disable_preview })
+    body: JSON.stringify({ command, kind, reply, payload, parse_mode, disable_preview, active: true, group_id })
   });
   const j = await r.json();
   document.getElementById('status').innerText = j.ok ? '✅ 已保存' : ('❌ '+(j.error||'失败'));
@@ -1099,6 +1597,34 @@ async function saveCmd(){
 async function delCmd(command){
   const r=await fetch(`/api/bots/${currentBotId}/commands/`+encodeURIComponent(command.replace(/^\//,'')),{method:'DELETE',credentials:'same-origin'});
   const j=await r.json(); document.getElementById('status').innerText=j.ok?'🗑️ 已删':'❌ 失败'; loadCmds();
+}
+
+async function setCommandActive(id, active){
+  if(!currentBotId || id==null){ return; }
+  const r = await fetch(`/api/bots/${currentBotId}/commands/${id}/active`, {
+    method:'PATCH',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ active: !!active })
+  });
+  const j = await r.json();
+  const statusEl = document.getElementById('status');
+  statusEl.innerText = j.ok ? (active ? '✅ 指令已启用' : '⏸️ 指令已停用') : ('❌ '+(j.error||'状态更新失败'));
+  if(j.ok){ loadCmds(); loadBots(); }
+}
+
+async function setCommandGroup(id, groupId){
+  if(!currentBotId || id==null) return;
+  const r = await fetch(`/api/bots/${currentBotId}/commands/${id}/group`, {
+    method:'PATCH',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ group_id: groupId })
+  });
+  const j = await r.json();
+  const statusEl = document.getElementById('status');
+  statusEl.innerText = j.ok ? '🔗 分组已更新' : ('❌ '+(j.error||'分组更新失败'));
+  if(j.ok){ loadCmds(); }
 }
 
 async function eraseAll(){
@@ -1164,7 +1690,17 @@ async function loadFlows(){
   const wrap = document.getElementById('flow_cards');
   wrap.innerHTML = '';
   const rawItems = j.items || [];
-  const items = rawItems.map(f => ({...f, compiled: f.blocks_compiled || parseFlowCompiled(f.blocks_json)}));
+  const items = rawItems.map(f => {
+    const active = isActiveFlag(f.active);
+    const groupActive = Number(f.group_active ?? 1) === 1;
+    return {
+      ...f,
+      active,
+      group_active: f.group_active,
+      effective_active: active && groupActive,
+      compiled: f.blocks_compiled || parseFlowCompiled(f.blocks_json),
+    };
+  });
   flowsCache = items;
   if(!items.length){
     wrap.innerHTML = '<div class="text-sm text-gray-500">暂无流程，点击右上角「新建/编辑」开始创建。</div>';
@@ -1177,17 +1713,41 @@ async function loadFlows(){
     const card = document.createElement('div');
     card.className = 'animate-card rounded-2xl border border-gray-100 bg-white shadow transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl';
     const domId = `${f.id||idx}`;
+    const isActive = !!f.active;
+    const groupActive = Number(f.group_active ?? 1) === 1;
+    const effectiveActive = isActive && groupActive;
+    const stateText = !isActive ? '停用' : (groupActive ? '启用' : '组停用');
+    const stateClass = !isActive
+      ? 'bg-gray-100 text-gray-500'
+      : (groupActive ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-700');
+    const flowId = Number.isFinite(Number(f.id)) ? Number(f.id) : null;
+    const toggleBtn = flowId === null ? '' : `<button class="text-${isActive ? 'amber' : 'emerald'}-600 hover:text-${isActive ? 'amber' : 'emerald'}-700" onclick="setFlowActive(${flowId}, ${isActive ? 'false' : 'true'}); event.stopPropagation();">${isActive ? '停用' : '启用'}</button>`;
+    const groupBadge = f.group_name
+      ? `<span class="text-xs px-2 py-0.5 rounded-full ${groupActive ? 'bg-sky-100 text-sky-600' : 'bg-orange-100 text-orange-600'}">${escapeHtml(f.group_name)}${groupActive ? '' : '（组停用）'}</span>`
+      : `<span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">未分组</span>`;
+    const groupSelect = flowId === null ? '' : `
+      <label class="flex items-center gap-2 text-xs text-gray-500">
+        <span>分组</span>
+        <select class="border rounded-md px-2 py-1 text-sm" onchange="setFlowGroup(${flowId}, normalizeGroupId(this.value)); event.stopPropagation();">
+          ${renderGroupOptions('flows', f.group_id)}
+        </select>
+      </label>`;
     card.innerHTML = `
       <div class="p-4 flex flex-col gap-3">
         <div class="flex items-start justify-between gap-3">
           <div>
             <h3 class="text-base font-semibold text-gray-800 flex items-center gap-2">
               ${escapeHtml(f.name)}
-              <span class="text-xs px-2 py-0.5 rounded-full ${f.active? 'bg-emerald-100 text-emerald-600':'bg-gray-100 text-gray-500'}">${f.active?'启用':'停用'}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full ${stateClass}">${stateText}</span>
             </h3>
             <p class="text-xs text-gray-400 mt-1">更新：${fmt.date(f.updated_at || f.created_at)}</p>
+            <div class="flex items-center gap-2 mt-2 text-xs">
+              ${groupBadge}
+              ${groupSelect}
+            </div>
           </div>
           <div class="flex flex-col gap-1 text-xs text-right text-gray-400">
+            ${toggleBtn}
             <button class="text-indigo-600 hover:text-indigo-700" onclick="openBlocks(${f.id}); event.stopPropagation();">编辑</button>
             <button class="text-red-500 hover:text-red-600" onclick="deleteFlow(${f.id}); event.stopPropagation();">删除</button>
           </div>
@@ -1205,6 +1765,21 @@ async function loadFlows(){
     wrap.appendChild(card);
   });
   updateOverview();
+}
+
+
+async function setFlowActive(flowId, active){
+  if(!currentBotId || flowId==null) return;
+  const r = await fetch(`/api/bots/${currentBotId}/flows/${flowId}/active`, {
+    method:'PATCH',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ active: !!active })
+  });
+  const j = await r.json();
+  const statusEl = document.getElementById('status');
+  statusEl.innerText = j.ok ? (active ? '✅ 流程已启用' : '⏸️ 流程已停用') : ('❌ '+(j.error||'流程状态更新失败'));
+  if(j.ok){ loadFlows(); refreshStatus(); }
 }
 
 
@@ -1229,6 +1804,8 @@ function resetPseudoForm(){
   document.getElementById('pseudo_id').value='';
   document.getElementById('pseudo_title').value='';
   document.getElementById('pseudo_content').value='';
+  const pseudoGroup = document.getElementById('pseudo_group');
+  if(pseudoGroup) pseudoGroup.value='';
   document.getElementById('pseudo_status').innerText='';
 }
 
@@ -1241,17 +1818,41 @@ async function loadPseudocode(){
   pseudoCache = {};
   const sandboxBox = document.getElementById('sandbox_output');
   if(sandboxBox){ sandboxBox.classList.add('hidden'); sandboxBox.textContent=''; }
-  const items = (j.items||[]).map(it => ({...it}));
+  const items = (j.items||[]).map(it => {
+    const active = isActiveFlag(it.active);
+    const groupActive = Number(it.group_active ?? 1) === 1;
+    return {
+      ...it,
+      active,
+      group_active: it.group_active,
+      effective_active: active && groupActive,
+    };
+  });
   pseudocodeCache = items;
   items.forEach(it=>{
     pseudoCache[it.id] = it;
     const tr = document.createElement('tr'); tr.className='border-t';
     // 修复：将非法的换行符替换为 \n
     const excerpt = (it.content||'').split('\n').slice(0,2).join(' / ');
+    const groupActive = Number(it.group_active ?? 1) === 1;
+    const isActive = !!it.active;
+    const stateText = !isActive ? '停用' : (groupActive ? '启用' : '组停用');
+    const stateClass = !isActive
+      ? 'bg-gray-100 text-gray-500'
+      : (groupActive ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-700');
+    const stateBadge = `<span class="text-xs px-2 py-0.5 rounded-full ${stateClass}">${stateText}</span>`;
+    const toggleBtn = `<button class="text-sm ${isActive ? 'text-amber-600 hover:text-amber-700' : 'text-emerald-600 hover:text-emerald-700'}" onclick="setPseudocodeActive(${it.id}, ${isActive ? 'false' : 'true'}); event.stopPropagation();">${isActive ? '停用' : '启用'}</button>`;
+    const gid = normalizeGroupId(it.group_id);
+    const groupSelect = `<select class="border rounded-md px-2 py-1 text-xs" onchange="setPseudocodeGroup(${it.id}, normalizeGroupId(this.value));">
+      ${renderGroupOptions('pseudocode', gid)}
+    </select>`;
     tr.innerHTML = `<td class="py-2">${it.id}</td>
-      <td>${it.title}</td>
+      <td>${escapeHtml(it.title)}</td>
       <td class="text-gray-500">${escapeHtml(excerpt)}</td>
+      <td>${groupSelect}</td>
+      <td>${stateBadge}</td>
       <td class="space-x-2">
+        ${toggleBtn}
         <button class="text-indigo-600" onclick="editPseudocode(${it.id}); event.stopPropagation();">编辑</button>
         <button class="text-emerald-600" onclick="generateFlowFromPseudo(${it.id}); event.stopPropagation();">生成流程</button>
         <button class="text-amber-600" onclick="sandboxPseudo(${it.id}); event.stopPropagation();">沙盒</button>
@@ -1269,6 +1870,12 @@ function editPseudocode(id){
   document.getElementById('pseudo_id').value = data.id;
   document.getElementById('pseudo_title').value = data.title || '';
   document.getElementById('pseudo_content').value = data.content || '';
+  const pseudoGroup = document.getElementById('pseudo_group');
+  if(pseudoGroup){
+    const gid = normalizeGroupId(data.group_id);
+    pseudoGroup.innerHTML = renderGroupOptions('pseudocode', gid);
+    pseudoGroup.value = gid ?? '';
+  }
   document.getElementById('pseudo_status').innerText = '✏️ 当前编辑：' + data.title;
 }
 
@@ -1282,6 +1889,8 @@ async function savePseudocode(){
     return;
   }
   const payload = { title, content };
+  payload.group_id = normalizeGroupId(document.getElementById('pseudo_group').value);
+  payload.active = true;
   if(id) payload.id = Number(id);
   const r = await fetch(`/api/bots/${currentBotId}/pseudocode`, {
     method:'POST',
@@ -1303,6 +1912,34 @@ async function deletePseudocode(id){
   const j = await r.json();
   document.getElementById('pseudo_status').innerText = j.ok ? '🗑️ 已删除伪代码' : ('❌ '+(j.error||'删除失败'));
   loadPseudocode();
+}
+
+async function setPseudocodeActive(id, active){
+  if(!currentBotId) return;
+  const r = await fetch(`/api/bots/${currentBotId}/pseudocode/${id}/active`, {
+    method:'PATCH',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ active: !!active })
+  });
+  const j = await r.json();
+  const statusEl = document.getElementById('pseudo_status');
+  statusEl.innerText = j.ok ? (active ? '✅ 伪代码已启用' : '⏸️ 伪代码已停用') : ('❌ '+(j.error||'状态更新失败'));
+  if(j.ok){ loadPseudocode(); }
+}
+
+async function setPseudocodeGroup(id, groupId){
+  if(!currentBotId) return;
+  const r = await fetch(`/api/bots/${currentBotId}/pseudocode/${id}/group`, {
+    method:'PATCH',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ group_id: groupId })
+  });
+  const j = await r.json();
+  const statusEl = document.getElementById('pseudo_status');
+  statusEl.innerText = j.ok ? '🔗 分组已更新' : ('❌ '+(j.error||'状态更新失败'));
+  if(j.ok){ loadPseudocode(); }
 }
 
 async function generateFlowFromPseudo(id){

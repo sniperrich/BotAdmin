@@ -10,6 +10,7 @@ from . import auth  # noqa: E402,F401
 from . import bots  # noqa: E402,F401
 from . import commands  # noqa: E402,F401
 from . import flows  # noqa: E402,F401
+from . import groups  # noqa: E402,F401
 from . import pseudocode  # noqa: E402,F401
 from . import pro_scripts  # noqa: E402,F401
 from . import ai  # noqa: E402,F401

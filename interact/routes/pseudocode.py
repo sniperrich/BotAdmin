@@ -10,6 +10,8 @@ from data.database import (
     get_bot,
     get_pseudocode,
     list_pseudocode,
+    set_pseudocode_active,
+    set_pseudocode_group,
     upsert_flow,
     upsert_pseudocode,
     delete_pseudocode,
@@ -40,7 +42,9 @@ def api_upsert_pseudocode(bot_id: int):
     pseudo_id = data.get("id")
     title = data.get("title") or ""
     content = data.get("content") or ""
-    ok, err, pid = upsert_pseudocode(bot_id, title, content, pseudo_id)
+    active = data.get("active")
+    group_id = data.get("group_id")
+    ok, err, pid = upsert_pseudocode(bot_id, title, content, pseudo_id, active, group_id)
     status = 200 if ok else 400
     return jsonify({"ok": ok, "error": err, "id": pid}), status
 
@@ -53,6 +57,34 @@ def api_delete_pseudocode(bot_id: int, item_id: int):
     if not get_bot(g.user["id"], bot_id):
         return jsonify({"ok": False, "error": "无权限"}), 403
     ok, err = delete_pseudocode(bot_id, item_id)
+    status = 200 if ok else 404
+    return jsonify({"ok": ok, "error": err}), status
+
+
+@api_bp.patch("/bots/<int:bot_id>/pseudocode/<int:item_id>/active")
+@login_required
+def api_set_pseudocode_active(bot_id: int, item_id: int):
+    from flask import g
+
+    if not get_bot(g.user["id"], bot_id):
+        return jsonify({"ok": False, "error": "无权限"}), 403
+    data = request.get_json(silent=True) or {}
+    active = 1 if data.get("active", True) else 0
+    ok, err = set_pseudocode_active(bot_id, item_id, active)
+    status = 200 if ok else 404
+    return jsonify({"ok": ok, "error": err}), status
+
+
+@api_bp.patch("/bots/<int:bot_id>/pseudocode/<int:item_id>/group")
+@login_required
+def api_set_pseudocode_group(bot_id: int, item_id: int):
+    from flask import g
+
+    if not get_bot(g.user["id"], bot_id):
+        return jsonify({"ok": False, "error": "无权限"}), 403
+    data = request.get_json(silent=True) or {}
+    group_id = data.get("group_id")
+    ok, err = set_pseudocode_group(bot_id, item_id, group_id)
     status = 200 if ok else 404
     return jsonify({"ok": ok, "error": err}), status
 

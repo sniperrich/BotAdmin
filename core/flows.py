@@ -315,6 +315,14 @@ def load_vms_for_bot(bot_id: int) -> List[FlowVM]:
     vms: List[FlowVM] = []
     for row in _list_flows(bot_id):
         if int(row.get("active", 1)) != 1: continue
+        group_flag = row.get("group_active")
+        if group_flag is not None:
+            try:
+                if int(group_flag) != 1:
+                    continue
+            except (TypeError, ValueError):
+                if not group_flag:
+                    continue
         try:
             blocks = json.loads(row.get("blocks_json") or "{}")
             if isinstance(blocks, str): blocks = json.loads(blocks)

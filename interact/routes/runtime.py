@@ -20,7 +20,23 @@ def api_bot_start(bot_id: int):
     bot = get_bot(g.user["id"], bot_id)
     if not bot:
         return jsonify({"ok": False, "error": "无权限"}), 403
-    specs = list_commands(bot_id)
+    specs = []
+    for spec in list_commands(bot_id):
+        try:
+            if int(spec.get("active", 1) or 0) != 1:
+                continue
+        except (TypeError, ValueError):
+            if not spec.get("active"):
+                continue
+        group_flag = spec.get("group_active")
+        if group_flag is not None:
+            try:
+                if int(group_flag) != 1:
+                    continue
+            except (TypeError, ValueError):
+                if not group_flag:
+                    continue
+        specs.append(spec)
     ok, msg = registry.start(bot_id, bot["token"], specs)
     push_status_for_user(g.user["id"])
     return jsonify({"ok": ok, "msg": msg})
