@@ -7,7 +7,7 @@ from telegram import Update, BotCommand
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from .flows import load_vms_for_bot
-from data.database import list_pro_scripts
+from data.database import list_pro_scripts, kv_get, kv_set
 
 
 def _resolve_path(ctx: dict, path: str):
@@ -197,9 +197,12 @@ class BotProcess:
             cmd = script["command"].lstrip("/")
             code = script["code"]
 
-            async def make_handler(user_code):
-                sandbox_log = lambda msg: self._log(f"[script:{cmd}] {msg}")
-                wrapped_code = f"async def user_handler(bot, update, context, log):\n"
+            async def make_handler(user_code, command_name):
+                sandbox_log = lambda msg: self._log(f"[script:{command_name}] {msg}")
+                wrapped_code = (
+                    "async def user_handler(bot, update, context, log):\n"
+                    "    db = getattr(context, 'db', None)\n"
+                )
                 for line in user_code.splitlines():
                     wrapped_code += f"    {line}\n"
 
@@ -218,6 +221,50 @@ class BotProcess:
                 async def final_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     self.stats["messages"] += 1
                     try:
+                        chat = update.effective_chat
+                        chat_id = str(chat.id) if chat else None
+                        user = update.effective_user
+                        user_id = str(user.id) if user else None
+
+                        def _kv_get(scope: str, key: str, *, default=None):
+                            value = kv_get(
+                                self.bot_id,
+                                scope,
+                                chat_id if scope != 'bot' else None,
+                                user_id if scope == 'user' else None,
+                                key,
+                            )
+                            return default if value is None else value
+
+                        def _kv_set(scope: str, key: str, value):
+                            kv_set(
+                                self.bot_id,
+                                scope,
+                                chat_id if scope != 'bot' else None,
+                                user_id if scope == 'user' else None,
+                                key,
+                                value,
+                            )
+
+                        def _kv_delete(scope: str, key: str):
+                            kv_set(
+                                self.bot_id,
+                                scope,
+                                chat_id if scope != 'bot' else None,
+                                user_id if scope == 'user' else None,
+                                key,
+                                None,
+                            )
+
+                        ctx.db = {
+                            'get': _kv_get,
+                            'set': _kv_set,
+                            'delete': _kv_delete,
+                            'bot_id': self.bot_id,
+                            'chat_id': chat_id,
+                            'user_id': user_id,
+                        }
+
                         await local_scope['user_handler'](ctx.bot, update, ctx, sandbox_log)
                     except Exception as e:
                         self.stats["errors"] += 1;
@@ -231,7 +278,7 @@ class BotProcess:
                 return final_handler
 
             try:
-                handler_func = await make_handler(code)
+                handler_func = await make_handler(code, cmd)
                 handlers.append(CommandHandler(cmd, handler_func))
             except Exception as e:
                 self._log(f"Failed to compile script for /{cmd}: {e}", level="error")

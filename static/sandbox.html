@@ -1,0 +1,803 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>沙盒演练场</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧪</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    body { background-color: #f8fafc; }
+    .editor-pane,
+    .output-pane {
+      border-radius: 0.75rem;
+      box-shadow: 0 10px 15px -3px rgb(15 23 42 / 0.12), 0 4px 6px -4px rgb(15 23 42 / 0.08);
+      transition: all 0.3s ease-in-out;
+    }
+    .editor-pane {
+      background: white;
+    }
+    .output-pane {
+      background: linear-gradient(145deg, #0f172a 0%, #111c34 40%, #0b1222 100%);
+      color: #e2e8f0;
+    }
+    .panel-tab {
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      background-color: #f1f5f9;
+      color: #475569;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .panel-tab:hover {
+      background-color: #e2e8f0;
+      transform: translateY(-2px);
+    }
+    .panel-tab.active {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      box-shadow: 0 8px 16px rgba(99,102,241,0.3);
+    }
+    .mono-font {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    #blockly-editor {
+        height: calc(100vh - 200px);
+    }
+    #pro-editor, #pseudo-editor {
+        height: calc(100vh - 240px);
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+  </style>
+</head>
+<body class="p-4 lg:p-6">
+
+  <div class="grid grid-cols-1 xl:grid-cols-5 gap-6 h-full min-h-[calc(100vh-3rem)]">
+    <!-- Left: Editor Pane -->
+    <div class="editor-pane flex flex-col p-4 lg:p-6 xl:col-span-3">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-xl font-semibold text-gray-800">🧪 沙盒演练场</h1>
+        <div class="flex items-center gap-2">
+            <button id="save-item" class="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm">保存</button>
+            <button id="clear-editor" class="px-3 py-1.5 rounded-md bg-gray-200 text-sm">清空/新建</button>
+            <button onclick="window.close()" class="px-3 py-1.5 rounded-md bg-gray-200 text-sm">关闭</button>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-2 mb-4 border-b pb-3">
+        <div id="tabs" class="flex flex-wrap gap-2">
+          <button data-tab="pseudo" class="panel-tab active">中文伪代码</button>
+          <button data-tab="pro" class="panel-tab">专业脚本 (Pro)</button>
+          <button data-tab="flow" class="panel-tab">流程编排 (Blockly)</button>
+        </div>
+      </div>
+
+      <h2 id="editing-item-title" class="text-sm font-semibold text-gray-500 mb-2">正在创建新项目</h2>
+
+      <!-- Editor Content -->
+      <div class="flex-grow">
+        <div id="panel-pseudo" class="tab-panel">
+          <textarea id="pseudo-editor" class="w-full h-full border rounded-md p-3" placeholder="输入中文伪代码..."></textarea>
+        </div>
+        <div id="panel-pro" class="tab-panel hidden">
+          <div id="pro-editor" class="border"></div>
+        </div>
+        <div id="panel-flow" class="tab-panel hidden">
+          <div id="blockly-editor" class="w-full h-full bg-gray-50 rounded-md"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Output Pane -->
+    <div class="output-pane flex flex-col p-5 space-y-5 xl:col-span-2">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="space-y-2">
+                <h2 class="text-lg font-semibold text-slate-100">运行与输出</h2>
+                <div class="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                    <span id="sandbox-status" class="inline-flex items-center gap-1 rounded-full px-3 py-1 bg-slate-700 text-slate-100">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                        待执行
+                    </span>
+                    <span id="sandbox-duration">耗时 --</span>
+                    <span id="sandbox-timestamp">上次运行 --</span>
+                </div>
+            </div>
+            <div class="hidden md:flex flex-col items-end text-xs text-slate-400 gap-2">
+                <span class="inline-flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    连接就绪
+                </span>
+                <span id="sandbox-summary" class="text-slate-200 font-medium">等待执行...</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-5">
+            <div class="xl:col-span-3 bg-slate-900/50 border border-slate-800/60 rounded-2xl p-5 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="bot-selector" class="text-sm font-medium text-slate-400 block mb-1">选择 Bot</label>
+                        <select id="bot-selector" class="w-full bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-400/60 transition"></select>
+                    </div>
+                    <div>
+                        <label for="item-selector" class="text-sm font-medium text-slate-400 block mb-1">选择项目</label>
+                        <select id="item-selector" class="w-full bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-400/60 transition"></select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                    <div class="md:col-span-4">
+                        <label for="sandbox-input" class="text-sm font-medium text-slate-400 block mb-1">模拟输入</label>
+                        <input id="sandbox-input" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 transition" placeholder="例如 /start 或任意文本">
+                    </div>
+                    <div class="md:col-span-2 flex items-center md:justify-end">
+                        <button id="run-sandbox" class="w-full md:w-auto px-5 py-2.5 rounded-xl bg-emerald-500 text-white font-semibold shadow-lg shadow-emerald-500/30 transition hover:-translate-y-0.5 hover:bg-emerald-400">
+                            ▶️ 运行沙盒
+                        </button>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-3 text-xs text-slate-400">
+                    <span>模式：<span id="sandbox-mode-label" class="text-slate-100 font-medium">中文伪代码</span></span>
+                    <span>当前 Bot：<span id="sandbox-active-bot" class="text-slate-100 font-medium">未选择</span></span>
+                    <span>超时：<span class="text-slate-100 font-medium">5s</span></span>
+                </div>
+            </div>
+            <div class="bg-slate-900/50 border border-slate-800/60 rounded-2xl p-5 space-y-4 xl:col-span-1">
+                <h3 class="text-sm font-semibold text-slate-100 uppercase tracking-wide">运行提示</h3>
+                <ul class="text-xs text-slate-400 space-y-2 leading-relaxed">
+                    <li>• 输入框支持完整指令，例：<code class="bg-slate-800/70 px-1.5 py-0.5 rounded text-slate-200">/crypto bitcoin</code></li>
+                    <li>• 运行前请确保左侧内容已保存并选择对应项目。</li>
+                    <li>• 每次运行会记录耗时与时间戳，方便回溯。</li>
+                </ul>
+                <div class="rounded-xl border border-slate-700/60 bg-slate-900/70 p-3 text-xs text-slate-300 space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span>状态</span>
+                        <span id="sandbox-mini-status" class="text-emerald-300">待执行</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>输入摘要</span>
+                        <span id="sandbox-input-preview" class="text-slate-200 truncate max-w-[8rem]">（空）</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>输出行数</span>
+                        <span id="sandbox-line-count" class="text-slate-200">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 flex-grow">
+            <div class="bg-slate-900/60 border border-slate-800/70 rounded-2xl p-5 flex flex-col">
+                <h3 class="text-sm font-semibold text-slate-100 mb-3 uppercase tracking-wide">标准输出</h3>
+                <pre id="sandbox-output" class="mono-font text-sm flex-1 bg-slate-950/70 rounded-xl p-4 whitespace-pre-wrap overflow-y-auto"></pre>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800/70 rounded-2xl p-5 flex flex-col">
+                <h3 class="text-sm font-semibold text-slate-100 mb-3 uppercase tracking-wide">调试与警告</h3>
+                <pre id="sandbox-stderr" class="mono-font text-sm flex-1 bg-slate-950/70 rounded-xl p-4 whitespace-pre-wrap overflow-y-auto text-rose-200"></pre>
+            </div>
+        </div>
+    </div>
+  </div>
+
+<script>
+let proEditor;
+let blocklyWorkspace;
+let currentTab = 'pseudo';
+let botsCache = [];
+let itemsCache = { pseudo: [], pro: [], flow: [] };
+
+let monacoPromise = null;
+let blocklyPromise = null;
+
+const STATUS_BASE =
+    "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium shadow-sm transition";
+const STATUS_STYLE = {
+    idle: "bg-slate-700 text-slate-100",
+    running: "bg-amber-400/90 text-amber-950",
+    success: "bg-emerald-400/90 text-emerald-950",
+    error: "bg-rose-500 text-rose-50",
+};
+const STATUS_DOT = {
+    idle: "bg-slate-200",
+    running: "bg-amber-200",
+    success: "bg-emerald-200",
+    error: "bg-rose-200",
+};
+const MODE_LABEL_MAP = {
+    pseudo: "中文伪代码",
+    pro: "专业脚本",
+    flow: "流程编排",
+};
+
+function setSandboxStatus(state = "idle", label = "待执行") {
+    const badge = document.getElementById("sandbox-status");
+    const mini = document.getElementById("sandbox-mini-status");
+    const cls = `${STATUS_BASE} ${STATUS_STYLE[state] || STATUS_STYLE.idle}`;
+    const dot = STATUS_DOT[state] || STATUS_DOT.idle;
+    if (badge) {
+        badge.className = cls;
+        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${dot}"></span>${label}`;
+    }
+    if (mini) {
+        mini.textContent = label;
+        mini.className =
+            state === "success"
+                ? "text-emerald-300"
+                : state === "running"
+                ? "text-amber-300"
+                : state === "error"
+                ? "text-rose-300"
+                : "text-slate-300";
+    }
+}
+
+function setSandboxMeta({ duration, timestamp, summary, input, lines }) {
+    const durationEl = document.getElementById("sandbox-duration");
+    const timestampEl = document.getElementById("sandbox-timestamp");
+    const summaryEl = document.getElementById("sandbox-summary");
+    const inputPreviewEl = document.getElementById("sandbox-input-preview");
+    const lineCountEl = document.getElementById("sandbox-line-count");
+    if (durationEl && duration) durationEl.textContent = `耗时 ${duration}`;
+    if (timestampEl && timestamp) timestampEl.textContent = `上次运行 ${timestamp}`;
+    if (summaryEl && summary) summaryEl.textContent = summary;
+    if (inputPreviewEl && input !== undefined)
+        inputPreviewEl.textContent = input || "（空）";
+    if (lineCountEl && typeof lines === "number") lineCountEl.textContent = lines;
+}
+
+function countOutputLines(text) {
+    if (!text) return 0;
+    return text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean).length;
+}
+
+function updateActiveBotLabel() {
+    const selector = document.getElementById("bot-selector");
+    const activeEl = document.getElementById("sandbox-active-bot");
+    if (!selector || !activeEl) return;
+    const selected = selector.options[selector.selectedIndex];
+    activeEl.textContent = selected ? selected.textContent : "未选择";
+}
+
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const existingScript = document.querySelector(`script[src="${src}"]`);
+        if (existingScript) {
+            // If script is already loading/loaded, wait for it to complete
+            if (existingScript.dataset.loaded) {
+                resolve();
+            } else {
+                existingScript.addEventListener('load', () => resolve());
+                existingScript.addEventListener('error', () => reject(new Error(`Script load error for ${src}`)));
+            }
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => {
+            script.dataset.loaded = true;
+            resolve();
+        };
+        script.onerror = () => reject(new Error(`Script load error for ${src}`));
+        document.head.appendChild(script);
+    });
+}
+
+// --- Editor Initialization with Promises ---
+function initMonaco() {
+    if (monacoPromise) return monacoPromise;
+    monacoPromise = new Promise(async (resolve, reject) => {
+        try {
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js');
+            if (typeof require === 'undefined') {
+                // Retry if loader is not immediately available
+                setTimeout(() => resolve(initMonaco()), 100);
+                return;
+            }
+            require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }});
+            require(['vs/editor/editor.main'], () => {
+                const editor = monaco.editor.create(document.getElementById('pro-editor'), {
+                    value: "# 在这里输入你的 Python 专业脚本...",
+                    language: 'python',
+                    theme: 'vs-dark',
+                    automaticLayout: true,
+                    minimap: { enabled: false }
+                });
+                resolve(editor);
+            });
+        } catch (error) {
+            reject(error);
+        }
+    });
+    return monacoPromise;
+}
+
+function initBlockly() {
+    if (blocklyPromise) return blocklyPromise;
+    blocklyPromise = new Promise(async (resolve, reject) => {
+        try {
+            await loadScript('https://unpkg.com/blockly/blockly.min.js');
+            if (typeof Blockly === 'undefined') {
+                 setTimeout(() => resolve(initBlockly()), 100);
+                 return;
+            }
+            Blockly.defineBlocksWithJsonArray([
+                {"type":"on_command","message0":"当收到命令 /%1","args0":[{"type":"field_input","name":"CMD","text":"guess"}], "nextStatement":null, "colour":210},
+                {"type":"send_text","message0":"发送文本 %1","args0":[{"type":"field_input","name":"TEXT","text":"你好"}], "previousStatement":null, "nextStatement":null, "colour":160},
+                // Add all other block definitions here...
+            ]);
+            const workspace = Blockly.inject('blockly-editor', {
+                toolbox: {
+                    "kind": "flyoutToolbox",
+                    "contents": [
+                        { "kind":"label","text":"触发" },
+                        { "kind":"block","type":"on_command" },
+                        { "kind":"label","text":"动作" },
+                        { "kind":"block","type":"send_text" }
+                    ]
+                },
+                scrollbars: true,
+                trashcan: true,
+            });
+            resolve(workspace);
+        } catch (error) {
+            reject(error);
+        }
+    });
+    return blocklyPromise;
+}
+
+function toFlowJSON() {
+  if (!blocklyWorkspace) return {};
+  const workspaceState = Blockly.serialization.workspaces.save(blocklyWorkspace);
+  // This is a simplified serialization. A full one would parse the blocks into the custom JSON structure.
+  return { __workspaceState: workspaceState };
+}
+
+// --- UI & Tab Logic ---
+async function switchTab(tabName) {
+    currentTab = tabName;
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+    document.getElementById(`panel-${tabName}`).classList.remove('hidden');
+
+    document.querySelectorAll('[data-tab]').forEach(t => {
+        t.classList.toggle('active', t.dataset.tab === tabName);
+    });
+    const modeLabelEl = document.getElementById('sandbox-mode-label');
+    if (modeLabelEl) {
+        modeLabelEl.textContent = MODE_LABEL_MAP[tabName] || tabName;
+    }
+    setSandboxStatus('idle', '待执行');
+    setSandboxMeta({
+        summary: `等待执行 · ${MODE_LABEL_MAP[tabName] || tabName}`,
+        input: document.getElementById('sandbox-input')?.value || '',
+        lines: 0,
+    });
+
+    try {
+        if (tabName === 'pro') {
+            proEditor = await initMonaco();
+            proEditor.layout();
+        }
+        if (tabName === 'flow') {
+            blocklyWorkspace = await initBlockly();
+            // Blockly might need a resize event after the container becomes visible
+            setTimeout(() => Blockly.svgResize(blocklyWorkspace), 50);
+        }
+    } catch (error) {
+        console.error("Editor initialization failed:", error);
+        document.getElementById('sandbox-output').textContent = `错误：无法加载编辑器。\n${error.message}`;
+        return;
+    }
+    
+    await loadItemsForCurrentBot();
+}
+
+// --- Data Fetching & Content Loading ---
+async function loadBots() {
+    try {
+        const response = await fetch('/api/bots', { credentials: 'same-origin' });
+        const data = await response.json();
+        if (!data.items) throw new Error('Failed to load bots');
+        botsCache = data.items;
+        const selector = document.getElementById('bot-selector');
+        selector.innerHTML = botsCache.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+        if (botsCache.length > 0) {
+            selector.dispatchEvent(new Event('change'));
+        } else {
+            updateActiveBotLabel();
+        }
+        updateActiveBotLabel();
+    } catch (e) {
+        console.error("Error loading bots:", e);
+        document.getElementById('sandbox-output').textContent = `错误：无法加载 Bot 列表。请确保您已登录。`;
+    }
+}
+
+async function loadItemsForCurrentBot() {
+    const botId = document.getElementById('bot-selector').value;
+    if (!botId) return;
+
+    const endpoints = {
+        pseudo: `/api/bots/${botId}/pseudocode`,
+        pro: `/api/bots/${botId}/pro_scripts`,
+        flow: `/api/bots/${botId}/flows`
+    };
+
+    try {
+        const response = await fetch(endpoints[currentTab], { credentials: 'same-origin' });
+        const data = await response.json();
+        itemsCache[currentTab] = data.items || [];
+        populateItemSelector();
+    } catch (e) {
+        console.error(`Error loading ${currentTab} items:`, e);
+    }
+}
+
+function populateItemSelector() {
+    const selector = document.getElementById('item-selector');
+    const items = itemsCache[currentTab] || [];
+    let options = '<option value="">-- 新建 --</option>';
+    if (items.length > 0) {
+        options += items.map(item => `<option value="${item.id}">${item.title || item.name}</option>`).join('');
+    }
+    selector.innerHTML = options;
+    // Clear the editor to reflect the new state (nothing selected yet)
+    clearEditor(false);
+}
+
+async function loadContentForItem() {
+    const itemId = document.getElementById('item-selector').value;
+    const items = itemsCache[currentTab];
+    const item = items.find(i => String(i.id) === String(itemId));
+    const titleEl = document.getElementById('editing-item-title');
+
+    if (!item) {
+        titleEl.textContent = '正在创建新项目';
+        clearEditor(false);
+        return;
+    }
+
+    titleEl.textContent = `正在编辑: ${item.title || item.name}`;
+
+    if (currentTab === 'pseudo') {
+        document.getElementById('pseudo-editor').value = item.content || '';
+    } else if (currentTab === 'pro') {
+        if (!proEditor) proEditor = await initMonaco();
+        proEditor.setValue(item.code || '');
+    } else if (currentTab === 'flow') {
+        if (!blocklyWorkspace) blocklyWorkspace = await initBlockly();
+        blocklyWorkspace.clear();
+        try {
+            // The full block definition is needed here for proper deserialization
+            const flowJson = JSON.parse(item.blocks_json);
+            if (flowJson && flowJson.__workspaceState) {
+                Blockly.serialization.workspaces.load(flowJson.__workspaceState, blocklyWorkspace);
+            }
+        } catch (e) {
+            console.error("Failed to load blockly workspace:", e);
+        }
+    }
+}
+
+function clearEditor(resetSelector = true) {
+    if(resetSelector) document.getElementById('item-selector').value = '';
+    document.getElementById('editing-item-title').textContent = '正在创建新项目';
+
+    if (currentTab === 'pseudo') {
+        document.getElementById('pseudo-editor').value = '';
+    } else if (currentTab === 'pro' && proEditor) {
+        proEditor.setValue('# 在这里输入你的 Python 专业脚本...');
+    } else if (currentTab === 'flow' && blocklyWorkspace) {
+        blocklyWorkspace.clear();
+    }
+}
+
+// --- Save & Run Logic ---
+async function saveItem() {
+    const botId = document.getElementById('bot-selector').value;
+    if (!botId) {
+        alert('请先选择一个 Bot。');
+        return;
+    }
+
+    const itemId = document.getElementById('item-selector').value || undefined;
+    const items = itemsCache[currentTab];
+    const currentItem = itemId ? items.find(i => String(i.id) === String(itemId)) : null;
+
+    let endpoint;
+    let payload = { id: itemId ? Number(itemId) : undefined };
+
+    if (currentTab === 'pseudo') {
+        payload.content = document.getElementById('pseudo-editor').value;
+        const currentTitle = currentItem ? currentItem.title : '新的伪代码';
+        payload.title = prompt("请输入伪代码标题：", currentTitle);
+        if (!payload.title) return;
+        endpoint = `/api/bots/${botId}/pseudocode`;
+    } else if (currentTab === 'pro') {
+        payload.code = proEditor.getValue();
+        const currentName = currentItem ? currentItem.name : '新的专业脚本';
+        payload.name = prompt("请输入脚本名称：", currentName);
+        if (!payload.name) return;
+        const currentCommand = currentItem ? currentItem.command : '';
+        payload.command = prompt("请输入触发命令 (例如 /my_script)：", currentCommand);
+        endpoint = `/api/bots/${botId}/pro_scripts`;
+    } else if (currentTab === 'flow') {
+        const currentName = currentItem ? currentItem.name : '新的流程';
+        payload.name = prompt("请输入流程名称：", currentName);
+        if (!payload.name) return;
+        payload.blocks_json = JSON.stringify(toFlowJSON());
+        endpoint = `/api/bots/${botId}/flows`;
+    } else {
+        return;
+    }
+
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'credentials': 'same-origin' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (result.ok) {
+            alert('保存成功！');
+            await loadItemsForCurrentBot();
+            if(result.id) {
+                // Wait for DOM to update
+                setTimeout(() => {
+                    document.getElementById('item-selector').value = result.id;
+                }, 100);
+            }
+        } else {
+            alert(`保存失败: ${result.error || '未知错误'}`);
+        }
+    } catch (e) {
+        alert(`网络或服务器错误: ${e.message}`);
+    }
+}
+
+async function runSandbox() {
+    const botId = document.getElementById('bot-selector').value;
+    const input = document.getElementById('sandbox-input').value;
+    const stdoutEl = document.getElementById('sandbox-output');
+    const stderrEl = document.getElementById('sandbox-stderr');
+    const modeLabel = document.getElementById('sandbox-mode-label');
+    const startedAt = performance.now();
+    const modeText = modeLabel ? modeLabel.textContent : '';
+
+    stdoutEl.textContent = '';
+    stderrEl.textContent = '';
+    setSandboxStatus('running', '执行中');
+    setSandboxMeta({
+        duration: '--',
+        timestamp: null,
+        summary: `执行中 · ${modeText || '沙盒'}`,
+        input,
+        lines: 0,
+    });
+
+    const friendlyInput = input || '（空）';
+
+    if (!botId) {
+        setSandboxStatus('error', '缺少 Bot');
+        stderrEl.textContent = '错误：请先选择一个 Bot。';
+        setSandboxMeta({
+            duration: '--',
+            timestamp: new Date().toLocaleTimeString(),
+            summary: '失败 · 缺少 Bot',
+            input,
+            lines: 0,
+        });
+        return;
+    }
+
+    if (currentTab === 'pro') {
+        const code = proEditor ? proEditor.getValue() : '';
+        if (!code.trim()) {
+            setSandboxStatus('error', '缺少代码');
+            stderrEl.textContent = '错误：专业脚本代码不能为空。';
+            setSandboxMeta({
+                duration: '--',
+                timestamp: new Date().toLocaleTimeString(),
+                summary: '失败 · 缺少专业脚本',
+                input,
+                lines: 0,
+            });
+            return;
+        }
+        try {
+            const response = await fetch('/api/sandbox/execute', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, timeout: 5, input: input || '' })
+            });
+            const contentType = response.headers.get('content-type') || '';
+            const isJson = contentType.includes('application/json');
+            const payload = isJson ? await response.json() : await response.text();
+            if (!isJson) {
+                setSandboxStatus('error', '响应异常');
+                stderrEl.textContent = `沙盒执行失败：服务器返回非 JSON 响应。\n${payload}`;
+                setSandboxMeta({
+                    duration: '--',
+                    timestamp: new Date().toLocaleTimeString(),
+                    summary: '失败 · 非 JSON 响应',
+                    input,
+                    lines: 0,
+                });
+                return;
+            }
+            const result = payload;
+            if (!response.ok || !result.ok) {
+                setSandboxStatus('error', '执行失败');
+                stderrEl.textContent = result.error || result.stderr || '未知错误';
+                setSandboxMeta({
+                    duration: '--',
+                    timestamp: new Date().toLocaleTimeString(),
+                    summary: `失败 · ${result.error || '执行错误'}`,
+                    input,
+                    lines: 0,
+                });
+                return;
+            }
+            const stdoutText = (result.stdout || '').trim();
+            const stderrText = (result.stderr || '').trim();
+            stdoutEl.textContent = stdoutText || '✅ 执行完成（无标准输出）';
+            stderrEl.textContent = stderrText || '无警告';
+            const elapsed = `${((performance.now() - startedAt) / 1000).toFixed(2)}s`;
+            setSandboxStatus('success', '执行完成');
+            setSandboxMeta({
+                duration: elapsed,
+                timestamp: new Date().toLocaleTimeString(),
+                summary: `完成 · ${modeText || '专业脚本'} · 输入 ${friendlyInput}`,
+                input,
+                lines: countOutputLines(stdoutText),
+            });
+        } catch (error) {
+            console.error('Pro sandbox execution failed:', error);
+            setSandboxStatus('error', '执行失败');
+            stderrEl.textContent = `沙盒执行失败：${error.message}`;
+            setSandboxMeta({
+                duration: '--',
+                timestamp: new Date().toLocaleTimeString(),
+                summary: `失败 · ${error.message}`,
+                input,
+                lines: 0,
+            });
+        }
+    } else if (currentTab === 'pseudo') {
+        const content = document.getElementById('pseudo-editor').value;
+        if (!content.trim()) {
+            setSandboxStatus('error', '缺少伪代码');
+            stderrEl.textContent = '错误：伪代码内容不能为空。';
+            setSandboxMeta({
+                duration: '--',
+                timestamp: new Date().toLocaleTimeString(),
+                summary: '失败 · 缺少伪代码',
+                input,
+                lines: 0,
+            });
+            return;
+        }
+        try {
+            const response = await fetch('/api/sandbox/pseudo/execute', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content, input: input || '/demo' })
+            });
+            const contentType = response.headers.get('content-type') || '';
+            const isJson = contentType.includes('application/json');
+            const payload = isJson ? await response.json() : await response.text();
+            if (!isJson) {
+                setSandboxStatus('error', '响应异常');
+                stderrEl.textContent = `伪代码演练失败：服务器返回非 JSON 响应。\n${payload}`;
+                setSandboxMeta({
+                    duration: '--',
+                    timestamp: new Date().toLocaleTimeString(),
+                    summary: '失败 · 非 JSON 响应',
+                    input,
+                    lines: 0,
+                });
+                return;
+            }
+            const result = payload;
+            if (!response.ok || !result.ok) {
+                setSandboxStatus('error', '执行失败');
+                stderrEl.textContent = result.error || '伪代码演练失败：未知错误';
+                setSandboxMeta({
+                    duration: '--',
+                    timestamp: new Date().toLocaleTimeString(),
+                    summary: `失败 · ${result.error || '执行错误'}`,
+                    input,
+                    lines: 0,
+                });
+                return;
+            }
+            const segments = [];
+            segments.push(`命令: ${result.command || '（未生成命令）'}`);
+            if (result.summary) segments.push(result.summary);
+            (result.actions || []).forEach((act, idx) => {
+                const payload = act.text || act.url || act.prompt || JSON.stringify(act);
+                segments.push(`${idx + 1}. [${act.type}] ${payload}`);
+            });
+            if (result.analysis) {
+                segments.push('\n解析:');
+                segments.push(result.analysis);
+            }
+            const stdoutText = segments.join('\n');
+            stdoutEl.textContent = stdoutText;
+            stderrEl.textContent = '无警告';
+            const elapsed = `${((performance.now() - startedAt) / 1000).toFixed(2)}s`;
+            setSandboxStatus('success', '演练完成');
+            setSandboxMeta({
+                duration: elapsed,
+                timestamp: new Date().toLocaleTimeString(),
+                summary: `完成 · ${modeText || '伪代码'} · 输入 ${friendlyInput}`,
+                input,
+                lines: countOutputLines(stdoutText),
+            });
+        } catch (error) {
+            console.error('Pseudo sandbox execution failed:', error);
+            setSandboxStatus('error', '执行失败');
+            stderrEl.textContent = `伪代码演练失败：${error.message}`;
+            setSandboxMeta({
+                duration: '--',
+                timestamp: new Date().toLocaleTimeString(),
+                summary: `失败 · ${error.message}`,
+                input,
+                lines: 0,
+            });
+        }
+    } else {
+        setSandboxStatus('error', '暂不支持');
+        stdoutEl.textContent = '';
+        stderrEl.textContent = '此功能暂未对流程编排开放。';
+        setSandboxMeta({
+            duration: '--',
+            timestamp: new Date().toLocaleTimeString(),
+            summary: '失败 · 流程编排暂未开放',
+            input,
+            lines: 0,
+        });
+    }
+}
+
+// --- Event Listeners ---
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-tab]').forEach(tab => {
+        tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    });
+
+    document.getElementById('bot-selector').addEventListener('change', () => {
+        updateActiveBotLabel();
+        loadItemsForCurrentBot();
+    });
+    document.getElementById('item-selector').addEventListener('change', loadContentForItem);
+    document.getElementById('run-sandbox').addEventListener('click', runSandbox);
+    document.getElementById('save-item').addEventListener('click', saveItem);
+    document.getElementById('clear-editor').addEventListener('click', () => clearEditor(true));
+    document.getElementById('sandbox-input').addEventListener('input', (event) => {
+        const previewEl = document.getElementById('sandbox-input-preview');
+        if (previewEl) {
+            previewEl.textContent = event.target.value.trim() || '（空）';
+        }
+    });
+    
+    setSandboxStatus('idle', '待执行');
+    setSandboxMeta({
+        summary: `等待执行 · ${MODE_LABEL_MAP[currentTab]}`,
+        input: document.getElementById('sandbox-input')?.value || '',
+        lines: 0,
+    });
+    loadBots();
+    // Pre-init the first tab's editor if it's not pseudo
+    // switchTab(currentTab); // Initial call
+});
+</script>
+</script>
+</body>
+</html>

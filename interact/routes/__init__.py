@@ -15,5 +15,6 @@ from . import pseudocode  # noqa: E402,F401
 from . import pro_scripts  # noqa: E402,F401
 from . import ai  # noqa: E402,F401
 from . import runtime  # noqa: E402,F401
+from . import settings  # noqa: E402,F401
 
 __all__ = ["api_bp"]

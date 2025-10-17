@@ -7,6 +7,7 @@ from config import get_settings
 from data import get_user_by_id, init_db
 
 from .routes import api_bp
+from .routes.sandbox import sandbox_bp
 from .socket import init_socketio, socketio
 
 
@@ -34,7 +35,12 @@ def create_app() -> Flask:
     def index_html():
         return send_from_directory(settings.static_dir_str, "index.html")
 
+    @app.get("/sandbox.html")
+    def sandbox_html():
+        return send_from_directory(settings.static_dir_str, "sandbox.html")
+
     app.register_blueprint(api_bp)
+    app.register_blueprint(sandbox_bp)
 
     init_socketio(app)
     return app
