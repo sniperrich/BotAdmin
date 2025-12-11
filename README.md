@@ -1,168 +1,152 @@
-# 🤖 Bot Admin – High-Performance Async Telegram Bot Management System
-# 🤖 Bot Admin – 高性能异步 Telegram 机器人管理系统
+# Bot Admin
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="python" />
-  <img src="https://img.shields.io/badge/AsyncIO-Powered-brightgreen.svg" alt="asyncio" />
-  <img src="https://img.shields.io/badge/Flask-3.x%20Async-black.svg" alt="flask" />
-  <img src="https://img.shields.io/badge/Realtime-Socket.IO-ff9800.svg" alt="socketio" />
-  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="license" />
-</p>
+<div align="center">
 
-<p align="center">
-  <a href="#-中文版">简体中文</a> · <a href="#-english">English</a>
-</p>
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Async Framework](https://img.shields.io/badge/Async-Powered-green.svg)](https://docs.python.org/3/library/asyncio.html)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Telegram](https://img.shields.io/badge/Telegram-Bot%20API-FEC400.svg)](https://core.telegram.org/bots/api)
+
+**The High-Performance Control Plane for Telegram Automations**  
+**专为 Telegram 机器人打造的高性能异步管理控制台**
+
+[English](#-english) | [简体中文](#-简体中文)
+
+</div>
 
 ---
 
-## 🇨🇳 中文版 {#中文版}
+## 🚀 English
 
-### 🌟 项目简介 (Introduction)
-Bot Admin 是一个现代化的、完全异步架构的 Telegram 机器人管理平台。它旨在通过**可视化界面**解决机器人的**创建、配置、逻辑编排与监控**问题。
-经过最新的**全异步重构**，系统在处理高并发数据库操作和 I/O 密集型任务时性能显著提升。配合实时的 WebSocket 推送和安全沙盒，它不仅适合个人开发者托管多个机器人，也适合团队进行复杂的自动化流程编排。
+### What is Bot Admin?
 
-> **核心进化**：从传统的同步阻塞架构全面升级为 `Async/Await` + `aiosqlite` 异步架构，Web 响应速度与并发能力大幅跃升。
+Bot Admin is a self-hosted platform designed to manage, orchestrate, and monitor multiple Telegram bots from a single interface. Built on a fully **asynchronous architecture** (Python AsyncIO + aiosqlite), it handles high-concurrency workloads with ease while providing a seamless real-time experience.
 
-### ✨ 核心特性 (Features)
-| 模块 | 说明 |
-| --- | --- |
-| **⚡️ 全异步核心** | 基于 Python 异步生态（AsyncIO, aiosqlite）重写，路由与数据库全链路非阻塞。 |
-| **🔐 安全沙盒** | 内置 AST 静态分析与受限执行环境，确保 Pro Script 脚本安全运行（支持 stdout 重定向）。 |
-| **🧩 可视化流程** | 新一代 FlowVM 引擎，支持变量预取、异步渲染、键盘交互，逻辑编排更灵活。 |
-| **📡 实时看板** | Socket.IO 实时推送机器人状态、运行日志与统计数据，告别手动刷新。 |
-| **🤖 AI 驱动** | 集成 AI 接口（如 DeepSeek），一键生成 Python 伪代码、指令逻辑或流程图。 |
-| **📦 模块化设计** | 清晰的 `core` (内核), `data` (数据), `interact` (交互) 分层架构，易于维护。 |
+Whether you are running a simple auto-reply bot or a complex mesh of AI-driven agents, Bot Admin provides the primitives you need: **Flows**, **Pro Scripts**, and **AI Copilots**.
 
-### 🧱 目录结构 (Structure)
-```text
-BotAdmin/
-├─ config/            # 配置中心（环境加载、路径管理）
-├─ core/              # 核心引擎
-│  ├─ runtime.py      # 异步运行时与机器人注册表
-│  ├─ flows.py        # FlowVM 流程引擎（含变量渲染与逻辑执行）
-│  ├─ sandbox.py      # 安全沙盒执行环境
-│  └─ ai.py           # AI 接口适配器
-├─ data/              # 异步数据层 (aiosqlite DAO)
-├─ interact/          # 交互层
-│  ├─ routes/         # 纯异步 Flask 路由蓝图
-│  └─ socket.py       # WebSocket 实时推送逻辑
-├─ static/            # 前端资源 (SPA + TailwindCSS)
-├─ main.py            # 启动入口
-└─ requirements.txt   # 依赖清单
-```
+### Key Features
 
-### ⚙️ 快速开始 (Quick Start)
+- **⚡️ Native Async Core**: Built from the ground up with `async/await`. I/O operations (database, network) are non-blocking, ensuring your bots remain responsive even under load.
+- **🧠 AI-Assisted Logic**: Integrated with LLMs (e.g., DeepSeek). Describe your bot's behavior in natural language, and let the AI generate the code or flow for you.
+- **🛡️ Sandboxed Execution**: Run custom Python scripts safely. Our AST-based sandbox prevents malicious operations while allowing powerful logic execution.
+- **loop FlowVM Engine**: A visual flow engine that supports complex conversations, variable state management, and conditional branching—no coding required.
+- **📡 Real-Time Telemetry**: Watch your bots in action. Logs, status changes, and user interactions are pushed instantly to your dashboard via WebSockets.
 
-#### 1. 环境准备
-确保 Python 3.10+ 环境。
+### Installation
 
-#### 2. 安装依赖
-由于系统使用了异步 Flask 特性，请务必安装 `flask[async]` 或确保包含 `asgiref`。
+**1. Clone & Prep**
 ```bash
 git clone https://github.com/sniperrich/BotAdmin.git
 cd BotAdmin
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-pip install "flask[async]" # 确保异步支持
+source .venv/bin/activate
 ```
 
-#### 3. 环境变量 (可选)
-复制 `.env.example` (如有) 或直接设置：
+**2. Install Deps**
+> **Note**: System requires async extras for Flask.
 ```bash
-export APP_SECRET="your_secret_key"
-export DEEPSEEK_API_KEY="sk-xxxx" # AI 功能需要
+pip install -r requirements.txt
+pip install "flask[async]"
 ```
 
-#### 4. 启动服务
+**3. Launch**
 ```bash
 python main.py
 ```
-服务默认运行在 `http://0.0.0.0:8780` (端口可在 main.py 修改)。
+Visit `http://localhost:8780` and start automating.
 
-### 🛠 使用指南
-1. **添加机器人**：在 BotFather 申请 Token，在后台添加。
-2. **编写逻辑**：
-   - **固定指令**：简单的文本/图片回复。
-   - **Pro Scripts**：Python 脚本（运行在安全沙盒中）。
-   - **Flows**：复杂对话流，支持跳转、变量存储。
-3. **监控**：在 Dashboard 查看实时日志流。
+### Environment Configuration
+
+Configure your instance via environment variables or a `.env` file.
+
+```bash
+# Security
+APP_SECRET="change_this_to_something_random"
+
+# AI Capabilities (Optional)
+DEEPSEEK_API_KEY="sk-your-key-here"
+```
+
+### Development
+
+This project uses a modular design:
+- `core/`: The async brain (Runtime, VM, Sandbox).
+- `interact/`: The interface layer (Async Flask Routes, Socket.IO).
+- `data/`: The storage layer (aiosqlite).
+
+To extend functionality, check `interact/routes` for API endpoints or `core/flows.py` for VM logic.
 
 ---
 
-## 🇺🇸 English {#english}
+## 🇨🇳 简体中文
 
-### 🌟 Introduction
-Bot Admin is a state-of-the-art, **fully asynchronous** management console for Telegram Bots. It streamlines the lifecycle of bot development: **creation, configuration, orchestration, and monitoring**.
-With the latest **async refactor**, Bot Admin now leverages `aiosqlite` and `async/await` throughout its core, delivering superior performance for high-concurrency scenarios. Combined with real-time WebSockets and a secure execution sandbox, it's the ultimate tool for both hobbyists and engineering teams.
+### 简介
 
-> **Evolution**: Upgraded from synchronous blocking I/O to a modern `AsyncIO` architecture, significantly reducing latency and increasing throughput.
+Bot Admin 是一个现代化的 Telegram 机器人私有化管理平台。它不仅仅是一个简单的配置面板，更是一个**全异步的高性能自动化引擎**。
 
-### ✨ Key Features
-| Module | Description |
-| --- | --- |
-| **⚡️ Async Core** | Rewritten with Python's AsyncIO and `aiosqlite` for non-blocking database and I/O operations. |
-| **🔐 Secure Sandbox** | AST-based static analysis and restricted execution environment for "Pro Scripts". |
-| **🧩 FlowVM V2** | Enhanced Flow engine supporting async variable pre-fetching, rendering, and complex interactions. |
-| **📡 Realtime Dashboard** | Live status updates, logs, and statistics pushed via Socket.IO. |
-| **🤖 AI Copilot** | Integrated AI handlers (e.g., DeepSeek) to generate pseudocode, commands, and logic automatically. |
-| **📦 Modular Arch** | Clean separation of concerns: `core` (kernel), `data` (persistence), `interact` (API/WS). |
+通过 Bot Admin，你可以统一管理多个机器人实例，并使用多种方式定义机器人的行为：从简单的关键词回复，到可视化的流程图编排，再到专业级的 Python 脚本控制。配合内置的 AI 辅助功能，让机器人开发从未如此简单。
 
-### 🧱 Project Structure
-```text
-BotAdmin/
-├─ config/            # Configuration & Path Management
-├─ core/              # Kernel Modules
-│  ├─ runtime.py      # Async Runtime & Bot Registry
-│  ├─ flows.py        # FlowVM Engine (Rendering & Execution)
-│  ├─ sandbox.py      # Security Sandbox
-│  └─ ai.py           # AI Adapters
-├─ data/              # Data Access Layer (aiosqlite)
-├─ interact/          # Interface Layer
-│  ├─ routes/         # Async Flask Blueprints
-│  └─ socket.py       # WebSocket Bridge
-├─ static/            # Frontend Assets
-├─ main.py            # Entry Point
-└─ requirements.txt   # Dependencies
-```
+### 核心能力
 
-### ⚙️ Getting Started
+*   **⚡️ 全链路异步化**
+    摒弃传统的同步阻塞模型，采用 `AsyncIO` + `aiosqlite` + `Async Flask` 构建。数据库读写与网络请求完全非阻塞，单节点即可支撑高并发场景。
 
-#### 1. Prerequisites
-Python 3.10+ is required.
+*   **🛡️ 安全沙盒脚本 (Pro Scripts)**
+    允许在平台内直接编写 Python 代码来控制机器人。内置基于 AST 的静态分析沙盒，在提供灵活性的同时确保宿主机的安全。
 
-#### 2. Installation
-Ensure to install Flask with async extras.
+*   **🧩 可视化流程引擎 (FlowVM)**
+    全新设计的流程虚拟机。支持变量预取、状态保持、条件判断与循环。无需写代码，通过拖拽即可实现复杂的对话逻辑。
+
+*   **🤖 AI 智能副驾驶**
+    深度集成 LLM（如 DeepSeek）。在此输入：“写一个能查天气的机器人”，AI 将自动为你生成相应的伪代码或流程配置。
+
+*   **📡 毫秒级实时监控**
+    基于 WebSocket 的实时遥测系统。机器人的每一条日志、每一次状态变更都会实时推送到你的浏览器，无需手动刷新。
+
+### 快速开始
+
+**1. 获取代码**
 ```bash
 git clone https://github.com/sniperrich/BotAdmin.git
 cd BotAdmin
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-pip install "flask[async]" # Crucial for async routes
 ```
 
-#### 3. Configuration (Optional)
-Set environment variables:
+**2. 安装依赖**
+即使你使用 Windows，也推荐在虚拟环境中运行。
 ```bash
-export APP_SECRET="your_secure_secret"
-export DEEPSEEK_API_KEY="sk-xxxx" # For AI features
+python -m venv .venv
+# macOS / Linux
+source .venv/bin/activate
+# Windows
+.venv\Scripts\activate
+
+# 安装核心依赖
+pip install -r requirements.txt
+# 确保安装异步 Flask 支持
+pip install "flask[async]"
 ```
 
-#### 4. Run
+**3. 运行**
 ```bash
 python main.py
 ```
-Access the console at `http://0.0.0.0:8780` (or configured port).
+服务启动后，打开浏览器访问 `http://127.0.0.1:8780`。
 
-### 🛠 Usage
-1. **Register Bots**: Add your bot tokens from BotFather.
-2. **Define Logic**:
-   - **Commands**: Simple auto-replies.
-   - **Pro Scripts**: Python code running in a secure, sandboxed environment.
-   - **Flows**: Visual conversation flows with state management.
-3. **Monitor**: Watch real-time logs and status on the dashboard.
+### 配置说明
+
+建议在生产环境中通过环境变量配置密钥：
+
+*   `APP_SECRET`: Session 加密密钥（生产环境请务必修改）。
+*   `DEEPSEEK_API_KEY`: 配置后可开启 AI 辅助生成功能。
+
+### 目录指引
+
+*   `core/`: 核心逻辑层。包含异步运行时 (`runtime.py`)、流程虚拟机 (`flows.py`) 和沙盒 (`sandbox.py`)。
+*   `interact/`: 接口交互层。包含所有异步 API 路由 (`routes/`) 和 WebSocket 处理逻辑 (`socket.py`)。
+*   `data/`: 数据持久层。封装了所有基于 `aiosqlite` 的异步数据库操作。
 
 ---
 
-<p align="center">Made with ❤️ for the Telegram Bot Community.</p>
+<div align="center">
+    Built with ❤️ by Developers for Developers.
+</div>
