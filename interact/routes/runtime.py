@@ -14,14 +14,14 @@ from . import api_bp
 
 @api_bp.post("/bots/<int:bot_id>/start")
 @login_required
-def api_bot_start(bot_id: int):
+async def api_bot_start(bot_id: int):
     from flask import g
 
-    bot = get_bot(g.user["id"], bot_id)
+    bot = await get_bot(g.user["id"], bot_id)
     if not bot:
         return jsonify({"ok": False, "error": "无权限"}), 403
     specs = []
-    for spec in list_commands(bot_id):
+    for spec in await list_commands(bot_id):
         try:
             if int(spec.get("active", 1) or 0) != 1:
                 continue
@@ -44,10 +44,10 @@ def api_bot_start(bot_id: int):
 
 @api_bp.post("/bots/<int:bot_id>/stop")
 @login_required
-def api_bot_stop(bot_id: int):
+async def api_bot_stop(bot_id: int):
     from flask import g
 
-    if not get_bot(g.user["id"], bot_id):
+    if not await get_bot(g.user["id"], bot_id):
         return jsonify({"ok": False, "error": "无权限"}), 403
     ok, msg = registry.stop(bot_id)
     push_status_for_user(g.user["id"])
@@ -56,10 +56,10 @@ def api_bot_stop(bot_id: int):
 
 @api_bp.post("/bots/<int:bot_id>/sync")
 @login_required
-def api_bot_sync(bot_id: int):
+async def api_bot_sync(bot_id: int):
     from flask import g
 
-    if not get_bot(g.user["id"], bot_id):
+    if not await get_bot(g.user["id"], bot_id):
         return jsonify({"ok": False, "error": "无权限"}), 403
     ok, msg = registry.sync(bot_id)
     push_status_for_user(g.user["id"])
@@ -68,10 +68,10 @@ def api_bot_sync(bot_id: int):
 
 @api_bp.get("/bots/<int:bot_id>/status")
 @login_required
-def api_bot_status(bot_id: int):
+async def api_bot_status(bot_id: int):
     from flask import g
 
-    bot = get_bot(g.user["id"], bot_id)
+    bot = await get_bot(g.user["id"], bot_id)
     status = dict(registry.status(bot_id))
     if bot:
         status.setdefault("bot_id", bot["id"])
@@ -81,10 +81,10 @@ def api_bot_status(bot_id: int):
 
 @api_bp.get("/bots/<int:bot_id>/logs")
 @login_required
-def api_bot_logs(bot_id: int):
+async def api_bot_logs(bot_id: int):
     from flask import g
 
-    if not get_bot(g.user["id"], bot_id):
+    if not await get_bot(g.user["id"], bot_id):
         return jsonify({"ok": False, "items": [], "error": "无权限"}), 403
     try:
         lines = int(request.args.get("lines", 100))
@@ -97,10 +97,10 @@ def api_bot_logs(bot_id: int):
 
 @api_bp.get("/bots/status_all")
 @login_required
-def api_bot_status_all():
+async def api_bot_status_all():
     from flask import g
 
-    bots = list_bots(g.user["id"])
+    bots = await list_bots(g.user["id"])
     running = registry.status_all()
     items = []
     for bot in bots:

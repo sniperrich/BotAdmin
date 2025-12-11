@@ -38,8 +38,17 @@ def _status_loop():  # pragma: no cover - background thread
             push_status_for_user(user_id)
 
 
+import asyncio
+
 def _build_payload(user_id: int) -> Dict[str, object]:
-    bots = list_bots(user_id)
+    try:
+        return asyncio.run(_build_payload_async(user_id))
+    except Exception:
+        # Fallback empty if loop issues
+        return {"items": [], "ts": time.time()}
+
+async def _build_payload_async(user_id: int) -> Dict[str, object]:
+    bots = await list_bots(user_id)
     global_status = registry.status_all()
     items = []
     for bot in bots:

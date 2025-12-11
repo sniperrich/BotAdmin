@@ -20,16 +20,16 @@ _THEME_LABELS = {"light", "dark"}
 
 @api_bp.get("/settings")
 @login_required
-def api_get_settings():
+async def api_get_settings():
     from flask import g
 
-    prefs = get_user_settings(g.user["id"])
+    prefs = await get_user_settings(g.user["id"])
     return jsonify({"preferences": prefs})
 
 
 @api_bp.post("/settings/preferences")
 @login_required
-def api_update_preferences():
+async def api_update_preferences():
     from flask import g
 
     data = request.get_json(silent=True) or {}
@@ -37,7 +37,7 @@ def api_update_preferences():
     theme = data.get("theme")
     language = data.get("language")
     try:
-        prefs = upsert_user_settings(
+        prefs = await upsert_user_settings(
             g.user["id"],
             hot_reload_mode=mode,
             theme=theme,
@@ -50,7 +50,7 @@ def api_update_preferences():
 
 @api_bp.post("/settings/password")
 @login_required
-def api_change_password():
+async def api_change_password():
     from flask import g
 
     data = request.get_json(silent=True) or {}
@@ -58,10 +58,10 @@ def api_change_password():
     new_password = (data.get("new_password") or "").strip()
     if not current_password or not new_password:
         return jsonify({"ok": False, "error": "请填写当前密码和新密码"}), 400
-    user = get_user_by_id(g.user["id"])
+    user = await get_user_by_id(g.user["id"])
     if not user or user["password_hash"] != hash_password(current_password):
         return jsonify({"ok": False, "error": "当前密码不正确"}), 400
-    ok, err = update_user_password(g.user["id"], new_password)
+    ok, err = await update_user_password(g.user["id"], new_password)
     if not ok:
         return jsonify({"ok": False, "error": err}), 400
     return jsonify({"ok": True})

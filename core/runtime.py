@@ -179,7 +179,7 @@ class BotProcess:
     async def _make_pro_script_handlers(self):
         handlers = []
         self._pro_scripts = []
-        for script in list_pro_scripts(self.bot_id):
+        for script in await list_pro_scripts(self.bot_id):
             if not script.get('active'):
                 continue
             group_flag = script.get('group_active')
@@ -206,16 +206,43 @@ class BotProcess:
                 for line in user_code.splitlines():
                     wrapped_code += f"    {line}\n"
 
-                local_scope = {}
+                # 1. AST 静态安全检查
+                from .sandbox import validate_script_safety
+                is_safe, error_msg = validate_script_safety(code)
+                if not is_safe:
+                    raise ValueError(f"Security Check Failed:\n{error_msg}")
 
-                # 修复: 提供一个更完整的、安全的全局环境
+                # 2. 构建受限的沙箱环境
+                safe_builtins = {
+                    "True": True, "False": False, "None": None,
+                    "abs": abs, "all": all, "any": any, "ascii": ascii, "bin": bin, "bool": bool,
+                    "bytearray": bytearray, "bytes": bytes, "chr": chr, "complex": complex,
+                    "dict": dict, "dir": dir, "divmod": divmod, "enumerate": enumerate,
+                    "filter": filter, "float": float, "format": format, "frozenset": frozenset,
+                    "getattr": getattr, "hasattr": hasattr, "hash": hash, "hex": hex, "id": id,
+                    "int": int, "isinstance": isinstance, "issubclass": issubclass, "iter": iter,
+                    "len": len, "list": list, "map": map, "max": max, "min": min, "next": next,
+                    "object": object, "oct": oct, "ord": ord, "pow": pow, "print": sandbox_log, # 重定向 print 到 log
+                    "range": range, "repr": repr, "reversed": reversed, "round": round,
+                    "set": set, "setattr": setattr, "slice": slice, "sorted": sorted,
+                    "str": str, "sum": sum, "super": super, "tuple": tuple, "type": type, "zip": zip,
+                    "Exception": Exception, "ValueError": ValueError, "TypeError": TypeError,
+                    "KeyError": KeyError, "IndexError": IndexError, "AttributeError": AttributeError,
+                }
+                
                 sandbox_globals = {
-                    "__builtins__": __builtins__,  # 允许所有安全的内建函数
+                    "__builtins__": safe_builtins,
                     "asyncio": asyncio,
-                    "aiohttp": __import__("aiohttp"),
+                    "aiohttp": __import__("aiohttp"), # 白名单库
                     "json": __import__("json"),
+                    "re": __import__("re"),
+                    "random": __import__("random"),
+                    "math": __import__("math"),
+                    "datetime": __import__("datetime"),
+                    "time": __import__("time"),
                 }
 
+                local_scope = {}
                 exec(wrapped_code, sandbox_globals, local_scope)
 
                 async def final_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -226,8 +253,8 @@ class BotProcess:
                         user = update.effective_user
                         user_id = str(user.id) if user else None
 
-                        def _kv_get(scope: str, key: str, *, default=None):
-                            value = kv_get(
+                        async def _kv_get(scope: str, key: str, *, default=None):
+                            value = await kv_get(
                                 self.bot_id,
                                 scope,
                                 chat_id if scope != 'bot' else None,
@@ -236,8 +263,8 @@ class BotProcess:
                             )
                             return default if value is None else value
 
-                        def _kv_set(scope: str, key: str, value):
-                            kv_set(
+                        async def _kv_set(scope: str, key: str, value):
+                            await kv_set(
                                 self.bot_id,
                                 scope,
                                 chat_id if scope != 'bot' else None,
@@ -246,8 +273,8 @@ class BotProcess:
                                 value,
                             )
 
-                        def _kv_delete(scope: str, key: str):
-                            kv_set(
+                        async def _kv_delete(scope: str, key: str):
+                            await kv_set(
                                 self.bot_id,
                                 scope,
                                 chat_id if scope != 'bot' else None,
@@ -287,7 +314,7 @@ class BotProcess:
     async def _build_app(self):
         app = Application.builder().token(self.token).build()
 
-        self._vms = load_vms_for_bot(self.bot_id)
+        self._vms = await load_vms_for_bot(self.bot_id)
         self._log(f"flows loaded: {len(self._vms)}")
 
         for h in self._make_handlers():

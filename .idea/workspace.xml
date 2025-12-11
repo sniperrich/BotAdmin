@@ -4,17 +4,33 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="61ad430b-3620-4219-886a-6f7d79655f1d" name="更改" comment="update">
+    <list default="true" id="61ad430b-3620-4219-886a-6f7d79655f1d" name="更改" comment="SandBox FIXED">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ai_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/ai_client.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ai_client.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/bot_admin.db" beforeDir="false" afterPath="$PROJECT_DIR$/bot_admin.db" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot_registry.py" beforeDir="false" afterPath="$PROJECT_DIR$/bot_registry.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/db.py" beforeDir="false" afterPath="$PROJECT_DIR$/db.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/flow_engine.py" beforeDir="false" afterPath="$PROJECT_DIR$/flow_engine.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pseudo_convert.py" beforeDir="false" afterPath="$PROJECT_DIR$/pseudo_convert.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/bot_registry.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/flows.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/flows.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/runtime.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/runtime.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/sandbox.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/sandbox.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/database.py" beforeDir="false" afterPath="$PROJECT_DIR$/data/database.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flow_engine.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/interact/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/interact/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interact/routes/auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/interact/routes/auth.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interact/routes/bots.py" beforeDir="false" afterPath="$PROJECT_DIR$/interact/routes/bots.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interact/routes/commands.py" beforeDir="false" afterPath="$PROJECT_DIR$/interact/routes/commands.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interact/routes/flows.py" beforeDir="false" afterPath="$PROJECT_DIR$/interact/routes/flows.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interact/routes/groups.py" beforeDir="false" afterPath="$PROJECT_DIR$/interact/routes/groups.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interact/routes/pro_scripts.py" beforeDir="false" afterPath="$PROJECT_DIR$/interact/routes/pro_scripts.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interact/routes/pseudocode.py" beforeDir="false" afterPath="$PROJECT_DIR$/interact/routes/pseudocode.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interact/routes/runtime.py" beforeDir="false" afterPath="$PROJECT_DIR$/interact/routes/runtime.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interact/routes/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/interact/routes/settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interact/security.py" beforeDir="false" afterPath="$PROJECT_DIR$/interact/security.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interact/socket.py" beforeDir="false" afterPath="$PROJECT_DIR$/interact/socket.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/static/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/static/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/static/sandbox.html" beforeDir="false" afterPath="$PROJECT_DIR$/static/sandbox.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -24,8 +40,8 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="Python Script" />
         <option value="HTML File" />
+        <option value="Python Script" />
       </list>
     </option>
   </component>
@@ -52,22 +68,22 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "DefaultHtmlFileTemplate": "HTML File",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.app.executor": "Run",
-    "Python.ftp.executor": "Run",
-    "Python.main.executor": "Run",
-    "Python.testing.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "master",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;DefaultHtmlFileTemplate&quot;: &quot;HTML File&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.app.executor&quot;: &quot;Run&quot;,
+    &quot;Python.ftp.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.testing.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager" selected="Python.main">
     <configuration name="app" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="BotAdmin" />
@@ -198,11 +214,58 @@
       <option name="project" value="LOCAL" />
       <updated>1759922306927</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="restruct+websocket(NO polling)">
+      <option name="closed" value="true" />
+      <created>1760092777682</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1760092777682</updated>
+    </task>
+    <task id="LOCAL-00004" summary="update README.md">
+      <option name="closed" value="true" />
+      <created>1760093622823</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1760093622823</updated>
+    </task>
+    <task id="LOCAL-00005" summary="update!">
+      <option name="closed" value="true" />
+      <created>1760239490601</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1760239490601</updated>
+    </task>
+    <task id="LOCAL-00006" summary="SandBox FIXED">
+      <option name="closed" value="true" />
+      <created>1760708987656</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1760708987656</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="update" />
-    <option name="LAST_COMMIT_MESSAGE" value="update" />
+    <MESSAGE value="restruct+websocket(NO polling)" />
+    <MESSAGE value="update README.md" />
+    <MESSAGE value="update!" />
+    <MESSAGE value="SandBox FIXED" />
+    <option name="LAST_COMMIT_MESSAGE" value="SandBox FIXED" />
   </component>
 </project>

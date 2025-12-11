@@ -93,17 +93,80 @@ class _FakeDB:
     def __init__(self):
         self._store = {{}}
 
+    def _key(self, scope, name):
+        return (scope, name)
+
+    def _noop(self, op_name):
+        def handler(*args, **kwargs):
+            print(f"[db:{op_name}] 未实现的操作，参数: args={{args}}, kwargs={{kwargs}}")
+            return None
+        return handler
+
+    def get(self, scope, name, default=None):
+        return self._store.get(self._key(scope, name), default)
+
+    def set(self, scope, name, value):
+        self._store[self._key(scope, name)] = value
+        return value
+
+    def delete(self, scope, name):
+        return self._store.pop(self._key(scope, name), None) is not None
+
+    def incr(self, scope, name, amount=1):
+        key = self._key(scope, name)
+        current = self._store.get(key, 0)
+        try:
+            current = int(current)
+        except (TypeError, ValueError):
+            current = 0
+        current += amount
+        self._store[key] = current
+        return current
+
     def __getitem__(self, op):
-        if op == "get":
-            def getter(scope, name, default=None):
-                return self._store.get((scope, name), default)
-            return getter
-        if op == "set":
-            def setter(scope, name, value):
-                self._store[(scope, name)] = value
-                return value
-            return setter
-        raise KeyError(op)
+        operations = {{
+            "get": self.get,
+            "set": self.set,
+            "delete": self.delete,
+            "del": self.delete,
+            "incr": self.incr,
+        }}
+        return operations.get(op, self._noop(op))
+
+
+class _SandboxLogger:
+    def __init__(self, name="sandbox"):
+        self.name = name
+
+    def _emit(self, level, message, *args, **kwargs):
+        if args or kwargs:
+            try:
+                message = message.format(*args, **kwargs)
+            except Exception:
+                message = f"{{message}} {{args}} {{kwargs}}"
+        print(f"[{{level}}] {{message}}")
+
+    def info(self, message, *args, **kwargs):
+        self._emit("INFO", message, *args, **kwargs)
+
+    def debug(self, message, *args, **kwargs):
+        self._emit("DEBUG", message, *args, **kwargs)
+
+    def warning(self, message, *args, **kwargs):
+        self._emit("WARN", message, *args, **kwargs)
+
+    warn = warning
+
+    def error(self, message, *args, **kwargs):
+        self._emit("ERROR", message, *args, **kwargs)
+
+    def exception(self, message, *args, **kwargs):
+        self._emit("ERROR", message, *args, **kwargs)
+
+
+class _DummyApplication:
+    def __init__(self):
+        self.logger = _SandboxLogger()
 
 
 class _DummyContext:
@@ -112,7 +175,7 @@ class _DummyContext:
         self.bot = _DummyBot()
         self.chat_data = {{}}
         self.user_data = {{}}
-        self.application = type("App", (), {{"logger": None}})()
+        self.application = _DummyApplication()
         self.db = _FakeDB()
 
 
@@ -205,3 +268,49 @@ except Exception as e:
         # Clean up the temporary file
         if os.path.exists(code_file):
             os.remove(code_file)
+
+# ------------------------------------------------------------------------------
+# AST Static Analysis for Pro Scripts
+# ------------------------------------------------------------------------------
+
+import ast
+
+class SecurityVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self.errors = []
+
+    def visit_Import(self, node):
+        self.errors.append(f"Line {node.lineno}: 'import' statements are not allowed. Please use pre-imported modules.")
+
+    def visit_ImportFrom(self, node):
+        self.errors.append(f"Line {node.lineno}: 'from ... import' statements are not allowed.")
+
+    def visit_Call(self, node):
+        # Check for dangerous function calls like eval(), exec(), open(), etc.
+        if isinstance(node.func, ast.Name):
+            if node.func.id in ("eval", "exec", "open", "compile", "globals", "locals", "__import__", "exit", "quit", "help"):
+                self.errors.append(f"Line {node.lineno}: Function '{node.func.id}()' is restricted.")
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node):
+        # Optional: Prevent access to private attributes (starting with _)
+        if node.attr.startswith("_") and not node.attr.startswith("__"): # Allow dunder methods if needed, block single underscore
+             pass # Slightly too restrictive for some libraries, skipping for now unless strict mode.
+        self.generic_visit(node)
+
+def validate_script_safety(code: str) -> tuple[bool, str]:
+    """
+    Statically analyzes Python code to detect unsafe operations.
+    Returns (is_safe, error_message).
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return False, f"Syntax Error: {e}"
+
+    visitor = SecurityVisitor()
+    visitor.visit(tree)
+
+    if visitor.errors:
+        return False, "\n".join(visitor.errors)
+    return True, ""

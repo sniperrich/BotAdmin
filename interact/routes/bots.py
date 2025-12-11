@@ -14,10 +14,10 @@ from . import api_bp
 
 @api_bp.get("/bots")
 @login_required
-def api_list_bots():
+async def api_list_bots():
     from flask import g
 
-    bots = list_bots(g.user["id"])
+    bots = await list_bots(g.user["id"])
     items = []
     for bot in bots:
         items.append(
@@ -33,14 +33,14 @@ def api_list_bots():
 
 @api_bp.post("/bots")
 @login_required
-def api_add_bot():
+async def api_add_bot():
     from flask import g
 
     data = request.get_json(silent=True) or {}
     name = data.get("name", "").strip()
     token = data.get("token", "").strip()
     user_id = g.user["id"]
-    ok, err = create_bot(user_id, name, token)
+    ok, err = await create_bot(user_id, name, token)
     if ok:
         push_status_for_user(user_id)
     return jsonify({"ok": ok, "error": err})
@@ -48,12 +48,12 @@ def api_add_bot():
 
 @api_bp.delete("/bots/<int:bot_id>")
 @login_required
-def api_delete_bot(bot_id: int):
+async def api_delete_bot(bot_id: int):
     from flask import g
 
     registry.stop(bot_id)
     user_id = g.user["id"]
-    ok, err = delete_bot(user_id, bot_id)
+    ok, err = await delete_bot(user_id, bot_id)
     if ok:
         push_status_for_user(user_id)
     status = 200 if ok else 404

@@ -24,12 +24,19 @@ def create_app() -> Flask:
         SESSION_COOKIE_HTTPONLY=True,
     )
 
-    init_db()
+    import asyncio
+    try:
+        asyncio.run(init_db())
+    except Exception:
+        pass # Handle case where event loop is already running? rare in uvicorn/gunicorn start
 
     @app.before_request
-    def load_user():
+    async def load_user():
         uid = session.get("user_id")
-        g.user = get_user_by_id(uid) if uid else None
+        if uid:
+            g.user = await get_user_by_id(uid)
+        else:
+            g.user = None
 
     @app.get("/")
     def index_html():
